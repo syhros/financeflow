@@ -18,25 +18,6 @@
 - Toggle between "Assets" and "Transactions" tabs for investing accounts
 - marketData properly integrated for real-time valuations
 
-### 3. CSV Import Enhancements ⭐ NEW
-- **Account Detection System**: When CSV contains unmapped accounts, shows modal with:
-  - Auto-populated Account Name field
-  - Account Type dropdown (Checking, Savings, Credit Card, Loan)
-  - "Save Account" button - creates account and imports transactions
-  - "Cancel" button - skips transactions for unmapped account
-  - "Use Selected" button - maps to existing account
-- CSV import now correctly updates account balances
-- Both assets and debts properly updated based on transaction types
-- Mock data removed from "Stocks & Shares ISA"
-
-### 4. Display & UI Improvements
-- Fixed £NaN display issue - all zero/invalid balances show as £0
-- formatCurrency handles NaN, null, undefined safely
-- Edit buttons on both Accounts and Debts pages:
-  - Styled with padding (p-2)
-  - Green hover background (hover:bg-green-600)
-  - Rounded corners for better UX
-  - stopPropagation prevents modal opening on Debts
 
 ### 5. Data Management Features
 - **Reset All Accounts**: Clarified to set all balances to £0 (accounts remain)
