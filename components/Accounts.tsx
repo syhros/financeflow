@@ -180,7 +180,7 @@ const AssetAccountCard: React.FC<{ asset: Asset; onEdit: (acc: Asset) => void; o
                     )}
                     <p className="text-xs text-gray-400">Updated {asset.lastUpdated}</p>
                 </div>
-                {asset.status === 'Active' && <button onClick={(e) => { e.stopPropagation(); onEdit(asset); }} className="text-gray-500 hover:text-white"><PencilIcon className="w-4 h-4" /></button>}
+                {asset.status === 'Active' && <button onClick={(e) => { e.stopPropagation(); onEdit(asset); }} className="p-2 text-gray-500 hover:text-white hover:bg-green-600 rounded-lg transition-colors"><PencilIcon className="w-4 h-4" /></button>}
             </div>
         </Card>
     );
@@ -294,6 +294,7 @@ const Accounts: React.FC<AccountsProps> = ({ assets, marketData, onAddAsset, onU
                     account={selectedAccount}
                     accountType="asset"
                     transactions={transactions}
+                    marketData={marketData}
                 />
             )}
         </>

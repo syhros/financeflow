@@ -366,6 +366,7 @@ const Debts: React.FC<DebtsProps> = ({ debts, onAddDebt, onUpdateDebt, onAddTran
                     account={selectedDebt}
                     accountType="debt"
                     transactions={transactions}
+                    marketData={{}}
                 />
             )}
         </>
