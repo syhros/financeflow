@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Card from './Card';
 import { PlusIcon, PencilIcon, CloseIcon, CalendarIcon } from './icons';
-import { Bill, Asset } from '../types';
+import { Bill, Asset, User, Notification, Page } from '../types';
 import { format, isWithinInterval, addDays, compareAsc } from 'date-fns';
 import { useCurrency } from '../App';
+import UserHeader from './shared/UserHeader';
 
 interface BillsProps {
     bills: Bill[];
@@ -12,6 +13,15 @@ interface BillsProps {
     onUpdateBill: (bill: Bill) => void;
     highlightedItemId: string | null;
     setHighlightedItemId: (id: string | null) => void;
+    user: User;
+    notifications: Notification[];
+    debts: any[];
+    onUpdateUser: (user: User) => void;
+    onMarkAllNotificationsRead: () => void;
+    onNotificationClick: (notification: Notification) => void;
+    navigateTo: (page: Page) => void;
+    theme: 'light' | 'dark';
+    onToggleTheme: () => void;
 }
 
 const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; }> = ({ isOpen, onClose, title, children }) => {
@@ -161,7 +171,7 @@ const BillListItem: React.FC<{ bill: Bill; assets: Asset[]; onEdit: (bill: Bill)
     );
 };
 
-const Bills: React.FC<BillsProps> = ({ bills, assets, onAddBill, onUpdateBill, highlightedItemId, setHighlightedItemId }) => {
+const Bills: React.FC<BillsProps> = ({ bills, assets, onAddBill, onUpdateBill, highlightedItemId, setHighlightedItemId, user, notifications, debts, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedBill, setSelectedBill] = useState<Bill | undefined>(undefined);
     const [sort, setSort] = useState('date-asc');
@@ -254,10 +264,18 @@ const Bills: React.FC<BillsProps> = ({ bills, assets, onAddBill, onUpdateBill, h
             <div className="max-w-7xl mx-auto space-y-8">
                 <div className="flex justify-between items-center">
                     <h1 className="text-3xl font-bold text-white">Bills & Subscriptions</h1>
-                     <button onClick={() => handleOpenModal()} className="flex items-center bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">
-                        <PlusIcon className="h-5 w-5 mr-2" />
-                        Add Bill
-                    </button>
+                    <UserHeader
+                        user={user}
+                        notifications={notifications}
+                        onUpdateUser={onUpdateUser}
+                        onMarkAllNotificationsRead={onMarkAllNotificationsRead}
+                        onNotificationClick={onNotificationClick}
+                        navigateTo={navigateTo}
+                        theme={theme}
+                        onToggleTheme={onToggleTheme}
+                        assets={assets}
+                        debts={debts}
+                    />
                 </div>
                 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -311,6 +329,10 @@ const Bills: React.FC<BillsProps> = ({ bills, assets, onAddBill, onUpdateBill, h
                                    return <option key={id} value={id}>{account.name}</option>
                                })}
                             </select>
+                            <button onClick={() => handleOpenModal()} className="flex items-center bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity whitespace-nowrap">
+                                <PlusIcon className="h-5 w-5 mr-2" />
+                                Add New
+                            </button>
                         </div>
                     </div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

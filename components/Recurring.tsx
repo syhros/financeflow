@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Card from './Card';
 import { PlusIcon, PencilIcon, CloseIcon, CalendarIcon, RefreshIcon } from './icons';
-import { RecurringPayment, Asset, Debt } from '../types';
+import { RecurringPayment, Asset, Debt, User, Notification, Page } from '../types';
 import { format, addDays, addWeeks, addMonths, addYears, isWithinInterval, startOfDay } from 'date-fns';
 import { useCurrency } from '../App';
+import UserHeader from './shared/UserHeader';
 
 interface RecurringProps {
     payments: RecurringPayment[];
@@ -11,6 +12,14 @@ interface RecurringProps {
     debts: Debt[];
     onAddPayment: (payment: Omit<RecurringPayment, 'id'>) => void;
     onUpdatePayment: (payment: RecurringPayment) => void;
+    user: User;
+    notifications: Notification[];
+    onUpdateUser: (user: User) => void;
+    onMarkAllNotificationsRead: () => void;
+    onNotificationClick: (notification: Notification) => void;
+    navigateTo: (page: Page) => void;
+    theme: 'light' | 'dark';
+    onToggleTheme: () => void;
 }
 
 const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; }> = ({ isOpen, onClose, title, children }) => {
@@ -184,7 +193,7 @@ const PaymentListItem: React.FC<{ payment: RecurringPayment; assets: Asset[]; de
     )
 }
 
-const Recurring: React.FC<RecurringProps> = ({ payments, assets, debts, onAddPayment, onUpdatePayment }) => {
+const Recurring: React.FC<RecurringProps> = ({ payments, assets, debts, onAddPayment, onUpdatePayment, user, notifications, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedPayment, setSelectedPayment] = useState<RecurringPayment | undefined>(undefined);
     const [sort, setSort] = useState('date-asc');
@@ -304,10 +313,18 @@ const Recurring: React.FC<RecurringProps> = ({ payments, assets, debts, onAddPay
         <div className="max-w-7xl mx-auto space-y-8">
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold text-white">Recurring Payments</h1>
-                <button onClick={() => handleOpenModal()} className="flex items-center bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">
-                    <PlusIcon className="h-5 w-5 mr-2" />
-                    Add Payment
-                </button>
+                <UserHeader
+                    user={user}
+                    notifications={notifications}
+                    onUpdateUser={onUpdateUser}
+                    onMarkAllNotificationsRead={onMarkAllNotificationsRead}
+                    onNotificationClick={onNotificationClick}
+                    navigateTo={navigateTo}
+                    theme={theme}
+                    onToggleTheme={onToggleTheme}
+                    assets={assets}
+                    debts={debts}
+                />
             </div>
 
             {/* Upcoming Payments and Monthly Summary - Swapped positions */}
@@ -354,6 +371,10 @@ const Recurring: React.FC<RecurringProps> = ({ payments, assets, debts, onAddPay
                          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className={commonSelectStyles}>
                              {uniqueTypes.map(type => <option key={type} value={type}>{type === 'All' ? 'All Types' : type}</option>)}
                         </select>
+                        <button onClick={() => handleOpenModal()} className="flex items-center bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity whitespace-nowrap">
+                            <PlusIcon className="h-5 w-5 mr-2" />
+                            Add New
+                        </button>
                     </div>
                 </div>
                 <div className="divide-y divide-border-color">

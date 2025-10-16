@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Card from './Card';
-import { Debt, Transaction } from '../types';
+import { Debt, Transaction, User, Notification, Page } from '../types';
 import { PlusIcon, PencilIcon, CloseIcon, iconMap } from './icons';
 import { useCurrency } from '../App';
 import AccountDetailModal from './AccountDetailModal';
+import UserHeader from './shared/UserHeader';
 
 interface DebtsProps {
     debts: Debt[];
@@ -11,6 +12,15 @@ interface DebtsProps {
     onUpdateDebt: (debt: Debt, oldBalance?: number) => void;
     onAddTransaction?: (transaction: Omit<Transaction, 'id'>) => void;
     transactions?: Transaction[];
+    user: User;
+    notifications: Notification[];
+    assets: any[];
+    onUpdateUser: (user: User) => void;
+    onMarkAllNotificationsRead: () => void;
+    onNotificationClick: (notification: Notification) => void;
+    navigateTo: (page: Page) => void;
+    theme: 'light' | 'dark';
+    onToggleTheme: () => void;
 }
 
 const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; }> = ({ isOpen, onClose, title, children }) => {
@@ -257,7 +267,7 @@ const DebtAccountCard: React.FC<{ debt: Debt; onEdit: (acc: Debt) => void; onCli
     );
 };
 
-const Debts: React.FC<DebtsProps> = ({ debts, onAddDebt, onUpdateDebt, onAddTransaction, transactions = [] }) => {
+const Debts: React.FC<DebtsProps> = ({ debts, onAddDebt, onUpdateDebt, onAddTransaction, transactions = [], user, notifications, assets, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingDebt, setEditingDebt] = useState<Debt | undefined>(undefined);
     const [showClosed, setShowClosed] = useState(false);
@@ -322,10 +332,18 @@ const Debts: React.FC<DebtsProps> = ({ debts, onAddDebt, onUpdateDebt, onAddTran
             <div className="max-w-7xl mx-auto space-y-8">
                 <div className="flex justify-between items-center">
                     <h1 className="text-3xl font-bold text-white">Debts</h1>
-                    <button onClick={() => handleOpenModal()} className="flex items-center bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">
-                        <PlusIcon className="h-5 w-5 mr-2" />
-                        Add Debt
-                    </button>
+                    <UserHeader
+                        user={user}
+                        notifications={notifications}
+                        onUpdateUser={onUpdateUser}
+                        onMarkAllNotificationsRead={onMarkAllNotificationsRead}
+                        onNotificationClick={onNotificationClick}
+                        navigateTo={navigateTo}
+                        theme={theme}
+                        onToggleTheme={onToggleTheme}
+                        assets={assets}
+                        debts={debts}
+                    />
                 </div>
 
                 <Card className="text-center">

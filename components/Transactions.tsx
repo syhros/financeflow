@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Card from './Card';
-import { Transaction, Asset, Debt, Budgets, Category } from '../types';
+import { Transaction, Asset, Debt, Budgets, Category, User, Notification, Page } from '../types';
 import { BudgetDoughnut } from './charts';
 import { PlusIcon, PencilIcon, CloseIcon } from './icons';
 import { format } from 'date-fns';
 import { useCurrency } from '../App';
+import UserHeader from './shared/UserHeader';
 
 interface TransactionsProps {
     transactions: Transaction[];
@@ -16,6 +17,14 @@ interface TransactionsProps {
     onUpdateTransaction: (transaction: Transaction) => void;
     onDeleteTransaction: (transactionId: string) => void;
     onUpdateBudgets: (budgets: Budgets) => void;
+    user: User;
+    notifications: Notification[];
+    onUpdateUser: (user: User) => void;
+    onMarkAllNotificationsRead: () => void;
+    onNotificationClick: (notification: Notification) => void;
+    navigateTo: (page: Page) => void;
+    theme: 'light' | 'dark';
+    onToggleTheme: () => void;
 }
 
 const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; className?: string; }> = ({ isOpen, onClose, title, children, className }) => {
@@ -264,7 +273,7 @@ const TransactionItem: React.FC<{ tx: Transaction, onEdit: (tx: Transaction) => 
     );
 }
 
-const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts, budgets, categories, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onUpdateBudgets }) => {
+const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts, budgets, categories, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onUpdateBudgets, user, notifications, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
     const [filter, setFilter] = useState<'all' | 'expense' | 'income' | 'investing'>('all');
     const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
     const [chartView, setChartView] = useState<'expense' | 'income'>('expense');
@@ -380,10 +389,18 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts
         <div className="max-w-7xl mx-auto space-y-8">
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold text-white">Transactions</h1>
-                 <button onClick={() => handleOpenTxModal()} className="flex items-center bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">
-                    <PlusIcon className="h-5 w-5 mr-2" />
-                    Add Transaction
-                </button>
+                <UserHeader
+                    user={user}
+                    notifications={notifications}
+                    onUpdateUser={onUpdateUser}
+                    onMarkAllNotificationsRead={onMarkAllNotificationsRead}
+                    onNotificationClick={onNotificationClick}
+                    navigateTo={navigateTo}
+                    theme={theme}
+                    onToggleTheme={onToggleTheme}
+                    assets={assets}
+                    debts={debts}
+                />
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -408,6 +425,10 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts
                                         <option value="amount-desc">Amount (High to Low)</option>
                                         <option value="amount-asc">Amount (Low to High)</option>
                                     </select>
+                                    <button onClick={() => handleOpenTxModal()} className="flex items-center bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">
+                                        <PlusIcon className="h-5 w-5 mr-2" />
+                                        Add New
+                                    </button>
                                 </div>
                                 <div className="flex gap-2">
                                     {isSelecting ? (

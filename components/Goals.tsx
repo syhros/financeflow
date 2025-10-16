@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Card from './Card';
 import { PlusIcon, PencilIcon, CloseIcon, CalendarIcon, LinkIcon, UnlinkIcon } from './icons';
-import { Goal, Asset } from '../types';
+import { Goal, Asset, User, Notification, Page } from '../types';
 import { format, differenceInMonths } from 'date-fns';
 import { useCurrency } from '../App';
+import UserHeader from './shared/UserHeader';
 
 interface GoalsProps {
     goals: Goal[];
@@ -12,6 +13,15 @@ interface GoalsProps {
     onUpdateGoal: (goal: Goal) => void;
     highlightedItemId: string | null;
     setHighlightedItemId: (id: string | null) => void;
+    user: User;
+    notifications: Notification[];
+    debts: any[];
+    onUpdateUser: (user: User) => void;
+    onMarkAllNotificationsRead: () => void;
+    onNotificationClick: (notification: Notification) => void;
+    navigateTo: (page: Page) => void;
+    theme: 'light' | 'dark';
+    onToggleTheme: () => void;
 }
 
 const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; }> = ({ isOpen, onClose, title, children }) => {
@@ -238,7 +248,7 @@ const GoalCard: React.FC<{ goal: Goal; assets: Asset[]; onEdit: (goal: Goal) => 
 };
 
 
-const Goals: React.FC<GoalsProps> = ({ goals, assets, onAddGoal, onUpdateGoal, highlightedItemId, setHighlightedItemId }) => {
+const Goals: React.FC<GoalsProps> = ({ goals, assets, onAddGoal, onUpdateGoal, highlightedItemId, setHighlightedItemId, user, notifications, debts, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedGoal, setSelectedGoal] = useState<Goal | undefined>(undefined);
 
@@ -275,10 +285,18 @@ const Goals: React.FC<GoalsProps> = ({ goals, assets, onAddGoal, onUpdateGoal, h
         <div className="max-w-7xl mx-auto space-y-8">
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold text-white">Goals</h1>
-                <button onClick={() => handleOpenModal()} className="flex items-center bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">
-                    <PlusIcon className="h-5 w-5 mr-2" />
-                    Add New Goal
-                </button>
+                <UserHeader
+                    user={user}
+                    notifications={notifications}
+                    onUpdateUser={onUpdateUser}
+                    onMarkAllNotificationsRead={onMarkAllNotificationsRead}
+                    onNotificationClick={onNotificationClick}
+                    navigateTo={navigateTo}
+                    theme={theme}
+                    onToggleTheme={onToggleTheme}
+                    assets={assets}
+                    debts={debts}
+                />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {goals.map(goal => <GoalCard key={goal.id} goal={goal} assets={assets} onEdit={handleOpenModal} className={goal.id === highlightedItemId ? 'highlight-animate' : ''} />)}

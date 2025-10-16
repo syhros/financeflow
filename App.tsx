@@ -170,6 +170,10 @@ const App: React.FC = () => {
         // Update the asset with all new properties
         setAssets(prev => prev.map(a => a.id === updatedAsset.id ? updatedAsset : a));
     };
+    const handleDeleteAsset = (assetId: string) => {
+        setAssets(prev => prev.filter(a => a.id !== assetId));
+        setTransactions(prev => prev.filter(t => t.accountId !== assetId));
+    };
 
     // Debt Handlers
     const handleAddDebt = (debt: Omit<Debt, 'id'>) => setDebts(prev => [...prev, { ...debt, id: new Date().toISOString() }]);
@@ -177,18 +181,25 @@ const App: React.FC = () => {
         // Update the debt with all new properties
         setDebts(prev => prev.map(d => d.id === updatedDebt.id ? updatedDebt : d));
     };
+    const handleDeleteDebt = (debtId: string) => {
+        setDebts(prev => prev.filter(d => d.id !== debtId));
+        setTransactions(prev => prev.filter(t => t.accountId !== debtId));
+    };
 
     // Goal Handlers
     const handleAddGoal = (goal: Omit<Goal, 'id'>) => setGoals(prev => [...prev, { ...goal, id: new Date().toISOString() }]);
     const handleUpdateGoal = (updatedGoal: Goal) => setGoals(prev => prev.map(g => g.id === updatedGoal.id ? updatedGoal : g));
-    
+    const handleDeleteGoal = (goalId: string) => setGoals(prev => prev.filter(g => g.id !== goalId));
+
     // Bill Handlers
     const handleAddBill = (bill: Omit<Bill, 'id'>) => setBills(prev => [...prev, { ...bill, id: new Date().toISOString() }]);
     const handleUpdateBill = (updatedBill: Bill) => setBills(prev => prev.map(b => b.id === updatedBill.id ? updatedBill : b));
-    
+    const handleDeleteBill = (billId: string) => setBills(prev => prev.filter(b => b.id !== billId));
+
     // Recurring Payment Handlers
     const handleAddRecurringPayment = (payment: Omit<RecurringPayment, 'id'>) => setRecurringPayments(prev => [...prev, { ...payment, id: new Date().toISOString() }]);
     const handleUpdateRecurringPayment = (updatedPayment: RecurringPayment) => setRecurringPayments(prev => prev.map(p => p.id === updatedPayment.id ? updatedPayment : p));
+    const handleDeleteRecurringPayment = (paymentId: string) => setRecurringPayments(prev => prev.filter(p => p.id !== paymentId));
     
     // Transaction Handlers
     const handleAddTransaction = (transaction: Omit<Transaction, 'id'>) => {
@@ -529,19 +540,19 @@ const App: React.FC = () => {
                             onToggleTheme={handleToggleTheme}
                         />;
             case Page.Transactions:
-                return <Transactions transactions={transactions} assets={assets} debts={debts} budgets={budgets} categories={categories} onAddTransaction={handleAddTransaction} onUpdateTransaction={handleUpdateTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateBudgets={handleUpdateBudgets} />;
+                return <Transactions transactions={transactions} assets={assets} debts={debts} budgets={budgets} categories={categories} onAddTransaction={handleAddTransaction} onUpdateTransaction={handleUpdateTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateBudgets={handleUpdateBudgets} user={user} notifications={notifications} onUpdateUser={handleUpdateUser} onMarkAllNotificationsRead={handleMarkAllNotificationsRead} onNotificationClick={handleNotificationClick} navigateTo={navigateTo} theme={theme} onToggleTheme={handleToggleTheme} />;
             case Page.Accounts:
-                return <Accounts assets={assets} marketData={marketData} onAddAsset={handleAddAsset} onUpdateAsset={handleUpdateAsset} onAddTransaction={handleAddTransaction} transactions={transactions} />;
+                return <Accounts assets={assets} marketData={marketData} onAddAsset={handleAddAsset} onUpdateAsset={handleUpdateAsset} onDeleteAsset={handleDeleteAsset} onAddTransaction={handleAddTransaction} transactions={transactions} user={user} notifications={notifications} debts={debts} onUpdateUser={handleUpdateUser} onMarkAllNotificationsRead={handleMarkAllNotificationsRead} onNotificationClick={handleNotificationClick} navigateTo={navigateTo} theme={theme} onToggleTheme={handleToggleTheme} />;
             case Page.Debts:
-                return <Debts debts={debts} onAddDebt={handleAddDebt} onUpdateDebt={handleUpdateDebt} onAddTransaction={handleAddTransaction} transactions={transactions} />;
+                return <Debts debts={debts} onAddDebt={handleAddDebt} onUpdateDebt={handleUpdateDebt} onDeleteDebt={handleDeleteDebt} onAddTransaction={handleAddTransaction} transactions={transactions} user={user} notifications={notifications} assets={assets} onUpdateUser={handleUpdateUser} onMarkAllNotificationsRead={handleMarkAllNotificationsRead} onNotificationClick={handleNotificationClick} navigateTo={navigateTo} theme={theme} onToggleTheme={handleToggleTheme} />;
             case Page.Trends:
                 return <Trends assets={assets} debts={debts} transactions={transactions} />;
             case Page.Goals:
-                 return <Goals goals={goals} assets={assets} onAddGoal={handleAddGoal} onUpdateGoal={handleUpdateGoal} highlightedItemId={highlightedItemId} setHighlightedItemId={setHighlightedItemId} />;
+                 return <Goals goals={goals} assets={assets} onAddGoal={handleAddGoal} onUpdateGoal={handleUpdateGoal} onDeleteGoal={handleDeleteGoal} highlightedItemId={highlightedItemId} setHighlightedItemId={setHighlightedItemId} user={user} notifications={notifications} debts={debts} onUpdateUser={handleUpdateUser} onMarkAllNotificationsRead={handleMarkAllNotificationsRead} onNotificationClick={handleNotificationClick} navigateTo={navigateTo} theme={theme} onToggleTheme={handleToggleTheme} />;
             case Page.Bills:
-                 return <Bills bills={bills} assets={assets} onAddBill={handleAddBill} onUpdateBill={handleUpdateBill} highlightedItemId={highlightedItemId} setHighlightedItemId={setHighlightedItemId} />;
+                 return <Bills bills={bills} assets={assets} onAddBill={handleAddBill} onUpdateBill={handleUpdateBill} onDeleteBill={handleDeleteBill} highlightedItemId={highlightedItemId} setHighlightedItemId={setHighlightedItemId} user={user} notifications={notifications} debts={debts} onUpdateUser={handleUpdateUser} onMarkAllNotificationsRead={handleMarkAllNotificationsRead} onNotificationClick={handleNotificationClick} navigateTo={navigateTo} theme={theme} onToggleTheme={handleToggleTheme} />;
             case Page.Recurring:
-                return <Recurring payments={recurringPayments} assets={assets} debts={debts} onAddPayment={handleAddRecurringPayment} onUpdatePayment={handleUpdateRecurringPayment} />;
+                return <Recurring payments={recurringPayments} assets={assets} debts={debts} onAddPayment={handleAddRecurringPayment} onUpdatePayment={handleUpdateRecurringPayment} onDeletePayment={handleDeleteRecurringPayment} user={user} notifications={notifications} onUpdateUser={handleUpdateUser} onMarkAllNotificationsRead={handleMarkAllNotificationsRead} onNotificationClick={handleNotificationClick} navigateTo={navigateTo} theme={theme} onToggleTheme={handleToggleTheme} />;
             case Page.Categorize:
                  return <Categorize transactions={uncategorizedTransactions} onUpdateTransaction={handleUpdateTransaction} onAddRule={handleAddRule} assets={assets} debts={debts} categories={categories} />;
             case Page.Settings:

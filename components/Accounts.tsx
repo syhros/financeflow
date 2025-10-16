@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Card from './Card';
-import { Asset, MarketData, Holding, Transaction } from '../types';
+import { Asset, MarketData, Holding, Transaction, User, Notification, Page } from '../types';
 import { PlusIcon, PencilIcon, CloseIcon, iconMap } from './icons';
 import { mockAssets } from '../data/mockData';
 import { useCurrency } from '../App';
 import AccountDetailModal from './AccountDetailModal';
+import UserHeader from './shared/UserHeader';
 
 interface AccountsProps {
     assets: Asset[];
@@ -13,6 +14,15 @@ interface AccountsProps {
     onUpdateAsset: (asset: Asset, oldBalance?: number) => void;
     onAddTransaction?: (transaction: Omit<Transaction, 'id'>) => void;
     transactions: Transaction[];
+    user: User;
+    notifications: Notification[];
+    debts: any[];
+    onUpdateUser: (user: User) => void;
+    onMarkAllNotificationsRead: () => void;
+    onNotificationClick: (notification: Notification) => void;
+    navigateTo: (page: Page) => void;
+    theme: 'light' | 'dark';
+    onToggleTheme: () => void;
 }
 
 const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; className?: string }> = ({ isOpen, onClose, title, children, className }) => {
@@ -185,7 +195,7 @@ const AssetAccountCard: React.FC<{ asset: Asset; onEdit: (acc: Asset) => void; o
     );
 };
 
-const Accounts: React.FC<AccountsProps> = ({ assets, marketData, onAddAsset, onUpdateAsset, onAddTransaction, transactions = [] }) => {
+const Accounts: React.FC<AccountsProps> = ({ assets, marketData, onAddAsset, onUpdateAsset, onAddTransaction, transactions = [], user, notifications, debts, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingAsset, setEditingAsset] = useState<Asset | undefined>(undefined);
     const [showClosed, setShowClosed] = useState(false);
@@ -249,10 +259,18 @@ const Accounts: React.FC<AccountsProps> = ({ assets, marketData, onAddAsset, onU
             <div className="max-w-7xl mx-auto space-y-8">
                 <div className="flex justify-between items-center">
                     <h1 className="text-3xl font-bold text-white">Accounts (Assets)</h1>
-                    <button onClick={() => handleOpenModal()} className="flex items-center bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">
-                        <PlusIcon className="h-5 w-5 mr-2" />
-                        Add Asset
-                    </button>
+                    <UserHeader
+                        user={user}
+                        notifications={notifications}
+                        onUpdateUser={onUpdateUser}
+                        onMarkAllNotificationsRead={onMarkAllNotificationsRead}
+                        onNotificationClick={onNotificationClick}
+                        navigateTo={navigateTo}
+                        theme={theme}
+                        onToggleTheme={onToggleTheme}
+                        assets={assets}
+                        debts={debts}
+                    />
                 </div>
 
                  <Card className="text-center">
