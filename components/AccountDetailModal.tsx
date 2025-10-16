@@ -16,7 +16,7 @@ interface AccountDetailModalProps {
 const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose, account, accountType, transactions, marketData = {} }) => {
     const [currentPage, setCurrentPage] = useState(1);
     const [activeTab, setActiveTab] = useState<'transactions' | 'assets'>('transactions');
-    const [perPage, setPerPage] = useState(12);
+    const [perPage, setPerPage] = useState(10);
     const { formatCurrency } = useCurrency();
 
     const isInvestingAccount = accountType === 'asset' && 'holdings' in account && account.type === 'Investing';
@@ -90,7 +90,7 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
+                <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 p-6 ${perPage > 10 ? 'overflow-y-auto max-h-[calc(90vh-180px)]' : ''}`}>
                     <div className="lg:col-span-2">
                         {isInvestingAccount && activeTab === 'assets' ? (
                             <div>
@@ -194,10 +194,10 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                                     }}
                                                     className="bg-gray-700 text-white rounded px-2 py-1 text-sm border border-gray-600 focus:border-primary outline-none"
                                                 >
-                                                    <option value={6}>6</option>
-                                                    <option value={12}>12</option>
-                                                    <option value={24}>24</option>
+                                                    <option value={10}>10</option>
+                                                    <option value={25}>25</option>
                                                     <option value={50}>50</option>
+                                                    <option value={100}>100</option>
                                                 </select>
                                             </div>
                                             <span className="text-sm text-gray-400">

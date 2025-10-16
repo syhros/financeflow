@@ -344,6 +344,10 @@ const Debts: React.FC<DebtsProps> = ({ debts, onAddDebt, onUpdateDebt, onAddTran
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {sortedDebts.map(acc => <DebtAccountCard key={acc.id} debt={acc} onEdit={handleOpenModal} onClick={(debt) => { setSelectedDebt(debt); setDetailModalOpen(true); }} />)}
+                        <button onClick={() => handleOpenModal()} className="w-full h-full p-6 border-2 border-dashed border-gray-600 rounded-2xl text-gray-400 hover:border-primary hover:text-primary transition-colors flex flex-col items-center justify-center min-h-[120px]">
+                            <PlusIcon className="h-8 w-8" />
+                            <span className="mt-2 font-semibold">Add Debt</span>
+                        </button>
                     </div>
                 </div>
 
