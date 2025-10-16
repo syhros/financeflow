@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import Card from './Card';
-import { Category, Currency, Asset, Debt, TransactionRule, Transaction } from '../types';
+import { Category, Currency, Asset, Debt, TransactionRule, Transaction, Goal, Bill, RecurringPayment, Budgets } from '../types';
 import { PlusIcon, CloseIcon, PencilIcon, TrashIcon, ShoppingBagIcon, GiftIcon, FilmIcon, CloudIcon, WrenchScrewdriverIcon, BanknotesIcon, HomeModernIcon, CarIcon, RefreshIcon, LightBulbIcon, iconMap } from './icons';
 import { useCurrency } from '../App';
+import JSZip from 'jszip';
 
 interface SettingsProps {
     categories: Category[];
@@ -905,6 +906,288 @@ const ExportDataModal: React.FC<{isOpen: boolean, onClose: () => void, assets: A
     )
 }
 
+const BackupDataModal: React.FC<{isOpen: boolean, onClose: () => void}> = ({isOpen, onClose}) => {
+    const [isBackingUp, setIsBackingUp] = useState(false);
+    const [success, setSuccess] = useState(false);
+
+    const handleBackup = async () => {
+        setIsBackingUp(true);
+        try {
+            const zip = new JSZip();
+
+            // Gather all data from localStorage
+            const data = {
+                assets: JSON.parse(localStorage.getItem('zenith-assets') || '[]'),
+                debts: JSON.parse(localStorage.getItem('zenith-debts') || '[]'),
+                transactions: JSON.parse(localStorage.getItem('zenith-transactions') || '[]'),
+                bills: JSON.parse(localStorage.getItem('zenith-bills') || '[]'),
+                goals: JSON.parse(localStorage.getItem('zenith-goals') || '[]'),
+                recurringPayments: JSON.parse(localStorage.getItem('zenith-recurring-payments') || '[]'),
+                budgets: JSON.parse(localStorage.getItem('zenith-budgets') || '{}'),
+                categories: JSON.parse(localStorage.getItem('zenith-categories') || '[]'),
+                rules: JSON.parse(localStorage.getItem('zenith-rules') || '[]'),
+                settings: {
+                    currency: localStorage.getItem('zenith-currency') || 'GBP',
+                    notificationsEnabled: localStorage.getItem('zenith-notifications-enabled') === 'true',
+                    autoCategorize: localStorage.getItem('zenith-auto-categorize') === 'true',
+                    smartSuggestions: localStorage.getItem('zenith-smart-suggestions') === 'true'
+                }
+            };
+
+            // Add each data type as separate JSON file
+            Object.entries(data).forEach(([key, value]) => {
+                zip.file(`${key}.json`, JSON.stringify(value, null, 2));
+            });
+
+            // Generate backup metadata
+            const metadata = {
+                backupDate: new Date().toISOString(),
+                version: '1.0',
+                appName: 'Zenith Finance Dashboard'
+            };
+            zip.file('metadata.json', JSON.stringify(metadata, null, 2));
+
+            // Generate ZIP file
+            const content = await zip.generateAsync({type: 'blob'});
+
+            // Download
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(content);
+            const fileName = `zenith_backup_${new Date().toISOString().split('T')[0]}.zip`;
+            link.setAttribute('href', url);
+            link.setAttribute('download', fileName);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            setSuccess(true);
+            setTimeout(() => {
+                onClose();
+                setSuccess(false);
+            }, 2000);
+        } catch (error) {
+            console.error('Backup failed:', error);
+            alert('Failed to create backup. Please try again.');
+        } finally {
+            setIsBackingUp(false);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" onClick={onClose}>
+            <div className="bg-card-bg rounded-lg shadow-xl w-full max-w-lg border border-border-color" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center p-6 border-b border-border-color">
+                    <h2 className="text-2xl font-bold text-white">Backup All Data</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white">
+                        <CloseIcon className="w-6 h-6" />
+                    </button>
+                </div>
+                <div className="p-6">
+                    {success ? (
+                        <div className="text-center py-8">
+                            <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-8 h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                            </div>
+                            <p className="text-white font-semibold">Backup created successfully!</p>
+                        </div>
+                    ) : (
+                        <>
+                            <p className="text-gray-300 mb-6">
+                                This will create a ZIP file containing all your:
+                            </p>
+                            <ul className="space-y-2 mb-6 text-gray-300">
+                                <li className="flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Accounts & Debts
+                                </li>
+                                <li className="flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Transactions
+                                </li>
+                                <li className="flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Bills & Recurring Payments
+                                </li>
+                                <li className="flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Goals & Budgets
+                                </li>
+                                <li className="flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Settings & Preferences
+                                </li>
+                            </ul>
+                            <div className="flex gap-3">
+                                <button onClick={onClose} className="flex-1 py-3 bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-600 transition-colors">
+                                    Cancel
+                                </button>
+                                <button onClick={handleBackup} disabled={isBackingUp} className="flex-1 py-3 bg-primary text-white rounded-lg font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity">
+                                    {isBackingUp ? 'Creating Backup...' : 'Create Backup'}
+                                </button>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const ImportBackupModal: React.FC<{isOpen: boolean, onClose: () => void, onImportComplete: () => void}> = ({isOpen, onClose, onImportComplete}) => {
+    const [isDragging, setIsDragging] = useState(false);
+    const [isImporting, setIsImporting] = useState(false);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState(false);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+    const handleFileSelect = async (file: File) => {
+        setError('');
+        setIsImporting(true);
+
+        try {
+            const zip = new JSZip();
+            const contents = await zip.loadAsync(file);
+
+            // Verify it's a valid backup
+            if (!contents.files['metadata.json']) {
+                throw new Error('Invalid backup file');
+            }
+
+            // Read and restore each data type
+            const dataTypes = ['assets', 'debts', 'transactions', 'bills', 'goals', 'recurringPayments', 'budgets', 'categories', 'rules', 'settings'];
+
+            for (const dataType of dataTypes) {
+                const fileName = `${dataType}.json`;
+                if (contents.files[fileName]) {
+                    const fileData = await contents.files[fileName].async('string');
+                    const parsed = JSON.parse(fileData);
+
+                    if (dataType === 'settings') {
+                        localStorage.setItem('zenith-currency', parsed.currency || 'GBP');
+                        localStorage.setItem('zenith-notifications-enabled', String(parsed.notificationsEnabled !== false));
+                        localStorage.setItem('zenith-auto-categorize', String(parsed.autoCategorize !== false));
+                        localStorage.setItem('zenith-smart-suggestions', String(parsed.smartSuggestions !== false));
+                    } else {
+                        localStorage.setItem(`zenith-${dataType.replace(/([A-Z])/g, '-$1').toLowerCase()}`, JSON.stringify(parsed));
+                    }
+                }
+            }
+
+            setSuccess(true);
+            setTimeout(() => {
+                onImportComplete();
+                window.location.reload();
+            }, 2000);
+        } catch (err) {
+            console.error('Import failed:', err);
+            setError('Failed to import backup. Please ensure you selected a valid backup file.');
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const file = e.dataTransfer.files[0];
+        if (file && file.name.endsWith('.zip')) {
+            handleFileSelect(file);
+        } else {
+            setError('Please select a ZIP backup file');
+        }
+    };
+
+    const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) handleFileSelect(file);
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" onClick={onClose}>
+            <div className="bg-card-bg rounded-lg shadow-xl w-full max-w-2xl border border-border-color" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center p-6 border-b border-border-color">
+                    <h2 className="text-2xl font-bold text-white">Import Backup</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white">
+                        <CloseIcon className="w-6 h-6" />
+                    </button>
+                </div>
+                <div className="p-6">
+                    {success ? (
+                        <div className="text-center py-8">
+                            <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-8 h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                            </div>
+                            <p className="text-white font-semibold">Backup restored successfully!</p>
+                            <p className="text-gray-400 text-sm mt-2">Reloading application...</p>
+                        </div>
+                    ) : (
+                        <>
+                            <div
+                                className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${
+                                    isDragging ? 'border-primary bg-primary/10' : 'border-gray-600 hover:border-gray-500'
+                                }`}
+                                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                                onDragLeave={() => setIsDragging(false)}
+                                onDrop={handleDrop}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-16 h-16 mx-auto mb-4 text-gray-400">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                                </svg>
+                                <p className="text-lg text-white mb-2">Drag and drop your backup ZIP file here</p>
+                                <p className="text-sm text-gray-400 mb-4">or</p>
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={isImporting}
+                                    className="px-6 py-2 bg-primary text-white rounded-lg font-semibold hover:opacity-90 disabled:opacity-50"
+                                >
+                                    {isImporting ? 'Importing...' : 'Browse Files'}
+                                </button>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept=".zip"
+                                    onChange={handleFileInput}
+                                    className="hidden"
+                                />
+                            </div>
+
+                            {error && (
+                                <div className="mt-4 p-3 bg-red-500/20 border border-red-500 rounded-lg">
+                                    <p className="text-red-400 text-sm">{error}</p>
+                                </div>
+                            )}
+
+                            <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                                <p className="text-yellow-400 text-sm font-semibold mb-1">Warning</p>
+                                <p className="text-yellow-300 text-xs">Importing a backup will replace all your current data. This action cannot be undone.</p>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const SettingRow: React.FC<{ title: string; children?: React.ReactNode; isDanger?: boolean; onClick?: () => void }> = ({ title, children, isDanger, onClick }) => (
     <div onClick={onClick} className={`flex justify-between items-center py-4 border-b border-border-color last:border-b-0 ${onClick ? 'cursor-pointer hover:bg-gray-800/50 -mx-4 px-4 rounded-md' : ''}`}>
         <span className={isDanger ? 'text-red-400' : 'text-white'}>{title}</span>
@@ -925,6 +1208,8 @@ const Settings: React.FC<SettingsProps> = (props) => {
     const [isWipeModalOpen, setIsWipeModalOpen] = useState(false);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
+    const [isImportBackupModalOpen, setIsImportBackupModalOpen] = useState(false);
     const { currency, setCurrency } = useCurrency();
 
     const currencyMap: {[key in Currency]: string} = { 'GBP': 'GBP (£)', 'USD': 'USD ($)', 'EUR': 'EUR (€)' };
@@ -936,6 +1221,8 @@ const Settings: React.FC<SettingsProps> = (props) => {
             <WipeDataModal isOpen={isWipeModalOpen} onClose={() => setIsWipeModalOpen(false)} onWipe={onWipeData} />
             <ExportDataModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} assets={assets} debts={debts} />
             <ImportDataModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onImport={onImportTransactions} onAddAsset={onAddAsset} onAddDebt={onAddDebt} assets={assets} debts={debts} />
+            <BackupDataModal isOpen={isBackupModalOpen} onClose={() => setIsBackupModalOpen(false)} />
+            <ImportBackupModal isOpen={isImportBackupModalOpen} onClose={() => setIsImportBackupModalOpen(false)} onImportComplete={() => setIsImportBackupModalOpen(false)} />
 
             <div className="space-y-8 max-w-4xl mx-auto">
                 <h1 className="text-3xl font-bold text-white">Settings</h1>
@@ -977,6 +1264,12 @@ const Settings: React.FC<SettingsProps> = (props) => {
                      <div>
                         <h3 className="text-lg font-semibold text-white mb-3">Data Management</h3>
                         <Card>
+                            <SettingRow title="Backup All Data (ZIP)" onClick={() => setIsBackupModalOpen(true)}>
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-400"><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" /></svg>
+                            </SettingRow>
+                            <SettingRow title="Import Backup (ZIP)" onClick={() => setIsImportBackupModalOpen(true)}>
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-400"><path strokeLinecap="round" strokeLinejoin="round" d="M9 8.25H7.5a2.25 2.25 0 00-2.25 2.25v9a2.25 2.25 0 002.25 2.25h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25H15M9 12l3 3m0 0l3-3m-3 3V2.25" /></svg>
+                            </SettingRow>
                             <SettingRow title="Export All Data to CSV" onClick={() => setIsExportModalOpen(true)}>
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-400"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
                             </SettingRow>
