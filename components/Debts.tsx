@@ -1,13 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Card from './Card';
-import { Debt } from '../types';
+import { Debt, Transaction } from '../types';
 import { PlusIcon, PencilIcon, CloseIcon, iconMap } from './icons';
 import { useCurrency } from '../App';
 
 interface DebtsProps {
     debts: Debt[];
     onAddDebt: (debt: Omit<Debt, 'id'>) => void;
-    onUpdateDebt: (debt: Debt) => void;
+    onUpdateDebt: (debt: Debt, oldBalance?: number) => void;
+    onAddTransaction?: (transaction: Omit<Transaction, 'id'>) => void;
 }
 
 const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; }> = ({ isOpen, onClose, title, children }) => {
@@ -25,15 +26,17 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; chi
     );
 };
 
-const AddEditDebtModal: React.FC<{ isOpen: boolean; onClose: () => void; debt?: Debt; onSave: (debt: any) => void;}> = ({ isOpen, onClose, debt, onSave }) => {
+const AddEditDebtModal: React.FC<{ isOpen: boolean; onClose: () => void; debt?: Debt; onSave: (debt: any, oldBalance?: number) => void;}> = ({ isOpen, onClose, debt, onSave }) => {
     const [formData, setFormData] = useState<any>({});
+    const [originalBalance, setOriginalBalance] = useState<number>(0);
     const [promoEnabled, setPromoEnabled] = useState(false);
-    const { currency } = useCurrency();
+    const { currency, formatCurrency } = useCurrency();
     const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
 
     useEffect(() => {
         if (debt) {
             setFormData(debt);
+            setOriginalBalance(debt.balance || 0);
             setPromoEnabled(!!debt.promotionalOffer);
         } else {
              setFormData({
@@ -48,6 +51,7 @@ const AddEditDebtModal: React.FC<{ isOpen: boolean; onClose: () => void; debt?: 
                 minPayment: 0,
                 originalBalance: 0,
             });
+            setOriginalBalance(0);
             setPromoEnabled(false);
         }
     }, [debt, isOpen]);
@@ -70,7 +74,7 @@ const AddEditDebtModal: React.FC<{ isOpen: boolean; onClose: () => void; debt?: 
         if (!promoEnabled) {
             delete dataToSave.promotionalOffer;
         }
-        onSave(dataToSave);
+        onSave(dataToSave, originalBalance);
         onClose();
     };
     
@@ -95,6 +99,11 @@ const AddEditDebtModal: React.FC<{ isOpen: boolean; onClose: () => void; debt?: 
                  <div>
                     <label htmlFor="balance" className={labelStyles}>Current Balance</label>
                     <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">{currencySymbol}</span><input type="number" id="balance" value={formData.balance || 0} onChange={e => setFormData({...formData, balance: parseFloat(e.target.value)})} className={`${commonInputStyles} pl-7`} /></div>
+                    {formData.interestRate > 0 && formData.balance > 0 && (
+                        <p className="text-sm text-red-400 mt-2">
+                            Costing {formatCurrency((formData.interestRate * formData.balance) / 100 / 12)} per month in interest
+                        </p>
+                    )}
                 </div>
                  <div className="grid grid-cols-2 gap-4">
                      <div>
@@ -240,7 +249,7 @@ const DebtAccountCard: React.FC<{ debt: Debt; onEdit: (acc: Debt) => void }> = (
     );
 };
 
-const Debts: React.FC<DebtsProps> = ({ debts, onAddDebt, onUpdateDebt }) => {
+const Debts: React.FC<DebtsProps> = ({ debts, onAddDebt, onUpdateDebt, onAddTransaction }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingDebt, setEditingDebt] = useState<Debt | undefined>(undefined);
     const [showClosed, setShowClosed] = useState(false);
@@ -248,7 +257,7 @@ const Debts: React.FC<DebtsProps> = ({ debts, onAddDebt, onUpdateDebt }) => {
     const { formatCurrency } = useCurrency();
 
     const totalBalance = useMemo(() => debts.filter(d => d.status === 'Active').reduce((sum, acc) => sum + acc.balance, 0), [debts]);
-    
+
     const activeDebts = debts.filter(acc => acc.status === 'Active');
     const closedDebts = debts.filter(acc => acc.status === 'Closed');
 
@@ -274,9 +283,24 @@ const Debts: React.FC<DebtsProps> = ({ debts, onAddDebt, onUpdateDebt }) => {
         setIsModalOpen(false);
     };
 
-    const handleSave = (data: any) => {
+    const handleSave = (data: any, oldBalance?: number) => {
         if (data.id) {
-            onUpdateDebt(data);
+            // If editing and balance changed, create a rebalance transaction
+            if (oldBalance !== undefined && oldBalance !== data.balance && onAddTransaction) {
+                const diff = data.balance - oldBalance;
+                // For debts, increase = more debt (expense), decrease = payment (income)
+                const transaction: Omit<Transaction, 'id'> = {
+                    merchant: `Updated Balance / Rebalance`,
+                    category: diff > 0 ? 'Debt Increase' : 'Debt Payment',
+                    date: new Date().toISOString(),
+                    amount: Math.abs(diff),
+                    type: diff > 0 ? 'expense' : 'income',
+                    accountId: data.id,
+                    logo: 'https://logo.clearbit.com/bank.com'
+                };
+                onAddTransaction(transaction);
+            }
+            onUpdateDebt(data, oldBalance);
         } else {
             onAddDebt(data);
         }

@@ -282,3 +282,131 @@ export const generateNetWorthData = (transactions: Transaction[]) => {
 // Export dynamic data
 export const dynamicIncomeExpenseData = generateIncomeExpenseData(allTransactions);
 export const dynamicNetWorthData = generateNetWorthData(allTransactions);
+
+// Dynamic Asset/Debt chart data generation
+export const generateAssetChartData = (transactions: Transaction[], assets: any[], timeFrame: 'day' | 'week' | 'month' | 'year') => {
+    const now = new Date();
+    const data: { name: string, value: number }[] = [];
+
+    // Calculate current total assets
+    const currentTotalAssets = assets.filter(a => a.status === 'Active').reduce((sum, a) => sum + a.balance, 0);
+
+    if (timeFrame === 'day') {
+        // Last 7 days
+        for (let i = 6; i >= 0; i--) {
+            const date = addDays(now, -i);
+            const dayName = format(date, 'EEE');
+
+            // Calculate balance at end of that day
+            const dayEnd = new Date(date);
+            dayEnd.setHours(23, 59, 59, 999);
+
+            const balance = calculateBalanceAtDate(transactions, assets, dayEnd);
+            data.push({ name: dayName, value: Math.round(balance) });
+        }
+    } else if (timeFrame === 'week') {
+        // Last 7 weeks
+        for (let i = 6; i >= 0; i--) {
+            const weekStart = addDays(now, -i * 7);
+            const weekLabel = format(weekStart, 'MMM dd');
+
+            const balance = calculateBalanceAtDate(transactions, assets, weekStart);
+            data.push({ name: weekLabel, value: Math.round(balance) });
+        }
+    } else if (timeFrame === 'month') {
+        // Last 6 months
+        for (let i = 5; i >= 0; i--) {
+            const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const monthName = format(monthDate, 'MMM');
+
+            const balance = calculateBalanceAtDate(transactions, assets, monthDate);
+            data.push({ name: monthName, value: Math.round(balance) });
+        }
+    } else if (timeFrame === 'year') {
+        // Last 6 years
+        for (let i = 5; i >= 0; i--) {
+            const yearDate = new Date(now.getFullYear() - i, 0, 1);
+            const yearName = yearDate.getFullYear().toString();
+
+            const balance = calculateBalanceAtDate(transactions, assets, yearDate);
+            data.push({ name: yearName, value: Math.round(balance) });
+        }
+    }
+
+    return data;
+};
+
+export const generateDebtChartData = (transactions: Transaction[], debts: any[], timeFrame: 'day' | 'week' | 'month' | 'year') => {
+    const now = new Date();
+    const data: { name: string, value: number }[] = [];
+
+    // Calculate current total debts
+    const currentTotalDebts = debts.filter(d => d.status === 'Active').reduce((sum, d) => sum + d.balance, 0);
+
+    if (timeFrame === 'day') {
+        // Last 7 days
+        for (let i = 6; i >= 0; i--) {
+            const date = addDays(now, -i);
+            const dayName = format(date, 'EEE');
+
+            const dayEnd = new Date(date);
+            dayEnd.setHours(23, 59, 59, 999);
+
+            const balance = calculateBalanceAtDate(transactions, debts, dayEnd);
+            data.push({ name: dayName, value: Math.round(balance) });
+        }
+    } else if (timeFrame === 'week') {
+        // Last 7 weeks
+        for (let i = 6; i >= 0; i--) {
+            const weekStart = addDays(now, -i * 7);
+            const weekLabel = format(weekStart, 'MMM dd');
+
+            const balance = calculateBalanceAtDate(transactions, debts, weekStart);
+            data.push({ name: weekLabel, value: Math.round(balance) });
+        }
+    } else if (timeFrame === 'month') {
+        // Last 6 months
+        for (let i = 5; i >= 0; i--) {
+            const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const monthName = format(monthDate, 'MMM');
+
+            const balance = calculateBalanceAtDate(transactions, debts, monthDate);
+            data.push({ name: monthName, value: Math.round(balance) });
+        }
+    } else if (timeFrame === 'year') {
+        // Last 6 years
+        for (let i = 5; i >= 0; i--) {
+            const yearDate = new Date(now.getFullYear() - i, 0, 1);
+            const yearName = yearDate.getFullYear().toString();
+
+            const balance = calculateBalanceAtDate(transactions, debts, yearDate);
+            data.push({ name: yearName, value: Math.round(balance) });
+        }
+    }
+
+    return data;
+};
+
+// Helper function to calculate balance at a specific date
+const calculateBalanceAtDate = (transactions: Transaction[], accounts: any[], targetDate: Date): number => {
+    // Start with current balances
+    const currentTotal = accounts.filter(a => a.status === 'Active').reduce((sum, a) => sum + a.balance, 0);
+
+    // Calculate transactions that happened AFTER target date
+    const futureTransactions = transactions.filter(tx => {
+        const txDate = new Date(tx.date);
+        return txDate > targetDate;
+    });
+
+    // Subtract future transactions to get balance at target date
+    let balanceAtDate = currentTotal;
+    futureTransactions.forEach(tx => {
+        if (tx.type === 'income') {
+            balanceAtDate -= tx.amount; // Remove income that hasn't happened yet
+        } else if (tx.type === 'expense') {
+            balanceAtDate += tx.amount; // Add back expenses that haven't happened yet
+        }
+    });
+
+    return balanceAtDate;
+};

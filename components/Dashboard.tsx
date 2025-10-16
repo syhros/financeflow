@@ -5,7 +5,7 @@ import { BalanceChart } from './charts';
 import { BellIcon, PlusIcon, iconMap, SettingsIcon, CalendarDaysIcon, CheckCircleIcon, InformationCircleIcon, PencilIcon, CloseIcon } from './icons';
 import { format, addDays, isWithinInterval, formatDistanceToNow } from 'date-fns';
 import { useCurrency } from '../App';
-import { assetDayData, assetWeekData, assetMonthData, assetYearData, debtDayData, debtWeekData, debtMonthData, debtYearData } from '../data/mockData';
+import { generateAssetChartData, generateDebtChartData } from '../data/mockData';
 
 // Custom hook to detect clicks outside a component
 const useOutsideClick = (ref: React.RefObject<HTMLDivElement>, callback: () => void) => {
@@ -289,10 +289,12 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
     const unreadNotificationsCount = useMemo(() => notifications.filter(n => !n.read).length, [notifications]);
 
     const getChartData = () => {
-        const sourceData = balanceType === 'assets'
-            ? { Day: assetDayData, Week: assetWeekData, Month: assetMonthData, Year: assetYearData }
-            : { Day: debtDayData, Week: debtWeekData, Month: debtMonthData, Year: debtYearData };
-        return sourceData[timePeriod];
+        const timeFrameMap = { Day: 'day' as const, Week: 'week' as const, Month: 'month' as const, Year: 'year' as const };
+        const timeFrame = timeFrameMap[timePeriod];
+
+        return balanceType === 'assets'
+            ? generateAssetChartData(transactions, assets, timeFrame)
+            : generateDebtChartData(transactions, debts, timeFrame);
     }
 
     const upcomingBills = bills.filter(bill => {

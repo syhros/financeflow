@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Card from './Card';
-import { Asset, MarketData, Holding } from '../types';
+import { Asset, MarketData, Holding, Transaction } from '../types';
 import { PlusIcon, PencilIcon, CloseIcon, iconMap } from './icons';
 import { mockAssets } from '../data/mockData';
 import { useCurrency } from '../App';
@@ -9,7 +9,8 @@ interface AccountsProps {
     assets: Asset[];
     marketData: MarketData;
     onAddAsset: (asset: Omit<Asset, 'id'>) => void;
-    onUpdateAsset: (asset: Asset) => void;
+    onUpdateAsset: (asset: Asset, oldBalance?: number) => void;
+    onAddTransaction?: (transaction: Omit<Transaction, 'id'>) => void;
 }
 
 const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; className?: string }> = ({ isOpen, onClose, title, children, className }) => {
@@ -27,14 +28,16 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; chi
     );
 };
 
-const AddEditAccountModal: React.FC<{ isOpen: boolean; onClose: () => void; asset?: Asset; onSave: (asset: any) => void; marketData: MarketData; }> = ({ isOpen, onClose, asset, onSave, marketData }) => {
+const AddEditAccountModal: React.FC<{ isOpen: boolean; onClose: () => void; asset?: Asset; onSave: (asset: any, oldBalance?: number) => void; marketData: MarketData; }> = ({ isOpen, onClose, asset, onSave, marketData }) => {
     const [formData, setFormData] = useState<any>({});
+    const [originalBalance, setOriginalBalance] = useState<number>(0);
     const { formatCurrency, currency } = useCurrency();
     const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
 
     useEffect(() => {
         if (asset) {
             setFormData(asset);
+            setOriginalBalance(asset.balance || 0);
         } else {
             setFormData({
                 accountType: 'asset',
@@ -47,16 +50,17 @@ const AddEditAccountModal: React.FC<{ isOpen: boolean; onClose: () => void; asse
                 icon: 'AccountsIcon',
                 holdings: []
             });
+            setOriginalBalance(0);
         }
     }, [asset, isOpen]);
-    
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
         setFormData((prev: any) => ({ ...prev, [id]: value }));
     };
 
     const handleSave = () => {
-        onSave(formData);
+        onSave(formData, originalBalance);
         onClose();
     };
 
@@ -127,6 +131,11 @@ const AddEditAccountModal: React.FC<{ isOpen: boolean; onClose: () => void; asse
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">{currencySymbol}</span>
                                 <input type="number" id="balance" value={formData.balance || 0} onChange={(e) => setFormData({...formData, balance: parseFloat(e.target.value)})} className={`${commonInputStyles} pl-7`} />
                             </div>
+                            {formData.interestRate > 0 && formData.balance > 0 && (
+                                <p className="text-sm text-green-400 mt-2">
+                                    Earning {formatCurrency((formData.interestRate * formData.balance) / 100 / 12)} per month
+                                </p>
+                            )}
                         </div>
                         <div>
                              <label htmlFor="interestRate" className={labelStyles}>Interest Rate (%)</label>
@@ -170,7 +179,7 @@ const AssetAccountCard: React.FC<{ asset: Asset; onEdit: (acc: Asset) => void }>
     );
 };
 
-const Accounts: React.FC<AccountsProps> = ({ assets, marketData, onAddAsset, onUpdateAsset }) => {
+const Accounts: React.FC<AccountsProps> = ({ assets, marketData, onAddAsset, onUpdateAsset, onAddTransaction }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingAsset, setEditingAsset] = useState<Asset | undefined>(undefined);
     const [showClosed, setShowClosed] = useState(false);
@@ -204,9 +213,23 @@ const Accounts: React.FC<AccountsProps> = ({ assets, marketData, onAddAsset, onU
         setIsModalOpen(false);
     };
 
-    const handleSave = (data: any) => {
+    const handleSave = (data: any, oldBalance?: number) => {
         if (data.id) {
-            onUpdateAsset(data);
+            // If editing and balance changed, create a rebalance transaction
+            if (oldBalance !== undefined && oldBalance !== data.balance && onAddTransaction) {
+                const diff = data.balance - oldBalance;
+                const transaction: Omit<Transaction, 'id'> = {
+                    merchant: `Updated Balance / Rebalance`,
+                    category: diff > 0 ? 'Balance Adjustment' : 'Balance Adjustment',
+                    date: new Date().toISOString(),
+                    amount: Math.abs(diff),
+                    type: diff > 0 ? 'income' : 'expense',
+                    accountId: data.id,
+                    logo: 'https://logo.clearbit.com/bank.com'
+                };
+                onAddTransaction(transaction);
+            }
+            onUpdateAsset(data, oldBalance);
         } else {
             onAddAsset(data);
         }

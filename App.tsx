@@ -166,11 +166,27 @@ const App: React.FC = () => {
 
     // Asset Handlers
     const handleAddAsset = (asset: Omit<Asset, 'id'>) => setAssets(prev => [...prev, { ...asset, id: new Date().toISOString() }]);
-    const handleUpdateAsset = (updatedAsset: Asset) => setAssets(prev => prev.map(a => a.id === updatedAsset.id ? updatedAsset : a));
+    const handleUpdateAsset = (updatedAsset: Asset, oldBalance?: number) => {
+        // Don't automatically update balance if oldBalance is provided - transaction will handle it
+        if (oldBalance !== undefined && oldBalance !== updatedAsset.balance) {
+            // Keep the old balance, let the transaction system update it
+            setAssets(prev => prev.map(a => a.id === updatedAsset.id ? { ...updatedAsset, balance: oldBalance } : a));
+        } else {
+            setAssets(prev => prev.map(a => a.id === updatedAsset.id ? updatedAsset : a));
+        }
+    };
 
     // Debt Handlers
     const handleAddDebt = (debt: Omit<Debt, 'id'>) => setDebts(prev => [...prev, { ...debt, id: new Date().toISOString() }]);
-    const handleUpdateDebt = (updatedDebt: Debt) => setDebts(prev => prev.map(d => d.id === updatedDebt.id ? updatedDebt : d));
+    const handleUpdateDebt = (updatedDebt: Debt, oldBalance?: number) => {
+        // Don't automatically update balance if oldBalance is provided - transaction will handle it
+        if (oldBalance !== undefined && oldBalance !== updatedDebt.balance) {
+            // Keep the old balance, let the transaction system update it
+            setDebts(prev => prev.map(d => d.id === updatedDebt.id ? { ...updatedDebt, balance: oldBalance } : d));
+        } else {
+            setDebts(prev => prev.map(d => d.id === updatedDebt.id ? updatedDebt : d));
+        }
+    };
 
     // Goal Handlers
     const handleAddGoal = (goal: Omit<Goal, 'id'>) => setGoals(prev => [...prev, { ...goal, id: new Date().toISOString() }]);
@@ -205,6 +221,8 @@ const App: React.FC = () => {
         
         const newTx = { ...finalTxData, id: new Date().toISOString() };
         setTransactions(prev => [newTx, ...prev]);
+
+        // Update assets
         setAssets(prevAssets => prevAssets.map(asset => {
             if (asset.id === transaction.accountId) {
                 const newBalance = transaction.type === 'income' ? asset.balance + transaction.amount : asset.balance - transaction.amount;
@@ -212,8 +230,64 @@ const App: React.FC = () => {
             }
             return asset;
         }));
+
+        // Update debts
+        setDebts(prevDebts => prevDebts.map(debt => {
+            if (debt.id === transaction.accountId) {
+                const newBalance = transaction.type === 'income' ? debt.balance - transaction.amount : debt.balance + transaction.amount;
+                return { ...debt, balance: newBalance };
+            }
+            return debt;
+        }));
     };
     const handleUpdateTransaction = (updatedTransaction: Transaction) => {
+        // Find the old transaction to calculate balance adjustment
+        const oldTransaction = transactions.find(t => t.id === updatedTransaction.id);
+
+        if (oldTransaction && (oldTransaction.amount !== updatedTransaction.amount || oldTransaction.type !== updatedTransaction.type)) {
+            // Update assets
+            setAssets(prevAssets => prevAssets.map(asset => {
+                if (asset.id === oldTransaction.accountId) {
+                    let balance = asset.balance;
+                    // Reverse old transaction
+                    if (oldTransaction.type === 'income') {
+                        balance -= oldTransaction.amount;
+                    } else if (oldTransaction.type === 'expense') {
+                        balance += oldTransaction.amount;
+                    }
+                    // Apply new transaction
+                    if (updatedTransaction.type === 'income') {
+                        balance += updatedTransaction.amount;
+                    } else if (updatedTransaction.type === 'expense') {
+                        balance -= updatedTransaction.amount;
+                    }
+                    return { ...asset, balance };
+                }
+                return asset;
+            }));
+
+            // Update debts
+            setDebts(prevDebts => prevDebts.map(debt => {
+                if (debt.id === oldTransaction.accountId) {
+                    let balance = debt.balance;
+                    // Reverse old transaction (for debts, income reduces debt, expense increases it)
+                    if (oldTransaction.type === 'income') {
+                        balance += oldTransaction.amount;
+                    } else if (oldTransaction.type === 'expense') {
+                        balance -= oldTransaction.amount;
+                    }
+                    // Apply new transaction
+                    if (updatedTransaction.type === 'income') {
+                        balance -= updatedTransaction.amount;
+                    } else if (updatedTransaction.type === 'expense') {
+                        balance += updatedTransaction.amount;
+                    }
+                    return { ...debt, balance };
+                }
+                return debt;
+            }));
+        }
+
         setTransactions(prev => prev.map(t => t.id === updatedTransaction.id ? updatedTransaction : t));
     };
 
@@ -361,9 +435,9 @@ const App: React.FC = () => {
             case Page.Transactions:
                 return <Transactions transactions={transactions} assets={assets} budgets={budgets} categories={categories} onAddTransaction={handleAddTransaction} onUpdateTransaction={handleUpdateTransaction} onUpdateBudgets={handleUpdateBudgets} />;
             case Page.Accounts:
-                return <Accounts assets={assets} marketData={marketData} onAddAsset={handleAddAsset} onUpdateAsset={handleUpdateAsset} />;
+                return <Accounts assets={assets} marketData={marketData} onAddAsset={handleAddAsset} onUpdateAsset={handleUpdateAsset} onAddTransaction={handleAddTransaction} />;
             case Page.Debts:
-                return <Debts debts={debts} onAddDebt={handleAddDebt} onUpdateDebt={handleUpdateDebt} />;
+                return <Debts debts={debts} onAddDebt={handleAddDebt} onUpdateDebt={handleUpdateDebt} onAddTransaction={handleAddTransaction} />;
             case Page.Trends:
                 return <Trends assets={assets} debts={debts} transactions={transactions} />;
             case Page.Goals:
