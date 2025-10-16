@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Card from './Card';
 import { Category, Currency, Asset, Debt, TransactionRule, Transaction } from '../types';
 import { PlusIcon, CloseIcon, PencilIcon, TrashIcon, ShoppingBagIcon, GiftIcon, FilmIcon, CloudIcon, WrenchScrewdriverIcon, BanknotesIcon, HomeModernIcon, CarIcon, RefreshIcon, LightBulbIcon, iconMap } from './icons';
@@ -22,6 +22,8 @@ interface SettingsProps {
     assets: Asset[];
     debts: Debt[];
     onImportTransactions: (transactions: Transaction[]) => void;
+    onAddAsset: (asset: Omit<Asset, 'id'>) => void;
+    onAddDebt: (debt: Omit<Debt, 'id'>) => void;
 }
 
 const availableIcons = [
@@ -238,7 +240,8 @@ const WipeDataModal: React.FC<{ isOpen: boolean; onClose: () => void; onWipe: (o
     const options = [
         { id: 'allTransactions', label: 'Delete all transactions', description: 'Removes every transaction record.' },
         { id: 'oldTransactions', label: 'Delete old transactions', description: 'Removes transactions older than 6 months.' },
-        { id: 'resetAccounts', label: 'Reset all accounts', description: 'Resets all assets and debts to their default state.' },
+        { id: 'resetAccounts', label: 'Reset all accounts', description: 'Sets all asset and debt balances to £0 (accounts remain).' },
+        { id: 'deleteAndResetBalances', label: 'Delete transactions and reset balances', description: 'Deletes all transactions and sets all account balances to £0.' },
         { id: 'fullReset', label: 'Full factory reset', description: 'Wipes all data and resets the application completely.' },
     ];
 
@@ -302,15 +305,205 @@ const WipeDataModal: React.FC<{ isOpen: boolean; onClose: () => void; onWipe: (o
     )
 }
 
-const ImportDataModal: React.FC<{isOpen: boolean, onClose: () => void, onImport: (transactions: Transaction[]) => void, assets: Asset[], debts: Debt[]}> = ({isOpen, onClose, onImport, assets, debts}) => {
+const AccountMappingModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    accountName: string;
+    onSaveNew: (name: string, type: string) => void;
+    onSelectExisting: (accountId: string) => void;
+    existingAccounts: (Asset | Debt)[];
+}> = ({ isOpen, onClose, accountName, onSaveNew, onSelectExisting, existingAccounts }) => {
+    const [name, setName] = useState(accountName);
+    const [type, setType] = useState('Checking');
+    const [selectedAccountId, setSelectedAccountId] = useState('');
+
+    useEffect(() => {
+        if (isOpen) {
+            setName(accountName);
+            setType('Checking');
+            setSelectedAccountId('');
+        }
+    }, [isOpen, accountName]);
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-[60] flex justify-center items-center p-4" onClick={onClose}>
+            <div className="bg-card-bg rounded-lg shadow-xl w-full max-w-lg border border-border-color" onClick={(e) => e.stopPropagation()}>
+                <div className="flex justify-between items-center p-6 border-b border-border-color">
+                    <h2 className="text-xl font-bold text-white">Account Not Found</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white"><CloseIcon className="w-6 h-6" /></button>
+                </div>
+                <div className="p-6">
+                    <p className="text-gray-300 mb-4">The account "{accountName}" was found in your CSV but doesn't exist in your database.</p>
+
+                    <div className="space-y-4 mb-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Account Name</label>
+                            <input
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-primary outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Account Type</label>
+                            <select
+                                value={type}
+                                onChange={(e) => setType(e.target.value)}
+                                className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-primary outline-none"
+                            >
+                                <option value="Checking">Checking</option>
+                                <option value="Savings">Savings</option>
+                                <option value="Credit Card">Credit Card</option>
+                                <option value="Loan">Loan</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="border-t border-border-color pt-4 mb-4">
+                        <p className="text-sm text-gray-400 mb-3">Or select an existing account:</p>
+                        <select
+                            value={selectedAccountId}
+                            onChange={(e) => setSelectedAccountId(e.target.value)}
+                            className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-primary outline-none"
+                        >
+                            <option value="">-- Select Account --</option>
+                            {existingAccounts.map(acc => (
+                                <option key={acc.id} value={acc.id}>{acc.name} ({acc.type})</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="flex gap-3">
+                        <button
+                            onClick={onClose}
+                            className="flex-1 py-3 bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-600 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        {selectedAccountId ? (
+                            <button
+                                onClick={() => onSelectExisting(selectedAccountId)}
+                                className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-500 transition-colors"
+                            >
+                                Use Selected
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => onSaveNew(name, type)}
+                                disabled={!name.trim()}
+                                className="flex-1 py-3 bg-primary text-white rounded-lg font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                            >
+                                Save Account
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const ImportDataModal: React.FC<{isOpen: boolean, onClose: () => void, onImport: (transactions: Transaction[]) => void, onAddAsset: (asset: Omit<Asset, 'id'>) => void, onAddDebt: (debt: Omit<Debt, 'id'>) => void, assets: Asset[], debts: Debt[]}> = ({isOpen, onClose, onImport, onAddAsset, onAddDebt, assets, debts}) => {
     const [isDragging, setIsDragging] = useState(false);
     const [error, setError] = useState<string>('');
     const [success, setSuccess] = useState<string>('');
+    const [showAccountMapping, setShowAccountMapping] = useState(false);
+    const [pendingAccountName, setPendingAccountName] = useState('');
+    const [pendingTransactions, setPendingTransactions] = useState<any[]>([]);
+    const [accountMappings, setAccountMappings] = useState<Map<string, string>>(new Map());
     const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+    const processCSV = (text: string) => {
+        const lines = text.split('\n').filter(line => line.trim());
+
+        if (lines.length < 2) {
+            setError('CSV file is empty or invalid');
+            return;
+        }
+
+        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+        const rawTransactions: any[] = [];
+        const unmappedAccounts = new Set<string>();
+
+        // Create account lookup by name
+        const allAccountsForImport = [...assets, ...debts];
+        const accountNameToId = new Map(allAccountsForImport.map(a => [a.name.toLowerCase(), a.id!]));
+
+        for (let i = 1; i < lines.length; i++) {
+            const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+
+            if (values.length !== headers.length) continue;
+
+            const transaction: any = {};
+            headers.forEach((header, index) => {
+                transaction[header.toLowerCase()] = values[index];
+            });
+
+            if (transaction.date && transaction.merchant && transaction.amount) {
+                rawTransactions.push(transaction);
+
+                // Check if account exists
+                if (transaction.account) {
+                    const accountLower = transaction.account.toLowerCase();
+                    if (!accountNameToId.has(accountLower) && !accountMappings.has(accountLower)) {
+                        unmappedAccounts.add(transaction.account);
+                    }
+                }
+            }
+        }
+
+        if (unmappedAccounts.size > 0) {
+            // Show modal for first unmapped account
+            const firstUnmapped = Array.from(unmappedAccounts)[0];
+            setPendingAccountName(firstUnmapped);
+            setPendingTransactions(rawTransactions);
+            setShowAccountMapping(true);
+            return;
+        }
+
+        // All accounts mapped, process transactions
+        const transactions: Transaction[] = rawTransactions.map((tx, i) => {
+            let accountId = allAccountsForImport[0]?.id || '1';
+
+            if (tx.account) {
+                const accountLower = tx.account.toLowerCase();
+                const mappedId = accountMappings.get(accountLower) || accountNameToId.get(accountLower);
+                if (mappedId) accountId = mappedId;
+            }
+
+            return {
+                id: `import-${Date.now()}-${i}`,
+                merchant: tx.merchant,
+                category: tx.category || 'Uncategorized',
+                date: tx.date,
+                amount: parseFloat(tx.amount),
+                type: tx.type || 'expense',
+                accountId: accountId,
+                logo: `https://logo.clearbit.com/${tx.merchant.toLowerCase().replace(/\s+/g, '')}.com`
+            };
+        });
+
+        if (transactions.length === 0) {
+            setError('No valid transactions found in CSV');
+            return;
+        }
+
+        onImport(transactions);
+        setSuccess(`Successfully imported ${transactions.length} transactions!`);
+
+        setTimeout(() => {
+            setAccountMappings(new Map());
+            onClose();
+        }, 2000);
+    };
 
     const handleFileSelect = (file: File) => {
         setError('');
         setSuccess('');
+        setAccountMappings(new Map());
 
         if (!file.name.endsWith('.csv')) {
             setError('Please select a CSV file');
@@ -321,68 +514,119 @@ const ImportDataModal: React.FC<{isOpen: boolean, onClose: () => void, onImport:
         reader.onload = (e) => {
             try {
                 const text = e.target?.result as string;
-                const lines = text.split('\n').filter(line => line.trim());
-
-                if (lines.length < 2) {
-                    setError('CSV file is empty or invalid');
-                    return;
-                }
-
-                const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-                const transactions: Transaction[] = [];
-
-                // Create account lookup by name
-                const allAccountsForImport = [...assets, ...debts];
-                const accountNameToId = new Map(allAccountsForImport.map(a => [a.name.toLowerCase(), a.id]));
-
-                for (let i = 1; i < lines.length; i++) {
-                    const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
-
-                    if (values.length !== headers.length) continue;
-
-                    const transaction: any = {};
-                    headers.forEach((header, index) => {
-                        transaction[header.toLowerCase()] = values[index];
-                    });
-
-                    // Convert to Transaction format
-                    if (transaction.date && transaction.merchant && transaction.amount) {
-                        // Map account name to ID, fallback to first asset if not found
-                        let accountId = '1';
-                        if (transaction.account) {
-                            const foundId = accountNameToId.get(transaction.account.toLowerCase());
-                            accountId = foundId || (allAccountsForImport[0]?.id || '1');
-                        }
-
-                        transactions.push({
-                            id: `import-${Date.now()}-${i}`,
-                            merchant: transaction.merchant,
-                            category: transaction.category || 'Uncategorized',
-                            date: transaction.date,
-                            amount: parseFloat(transaction.amount),
-                            type: transaction.type || 'expense',
-                            accountId: accountId,
-                            logo: `https://logo.clearbit.com/${transaction.merchant.toLowerCase().replace(/\s+/g, '')}.com`
-                        });
-                    }
-                }
-
-                if (transactions.length === 0) {
-                    setError('No valid transactions found in CSV');
-                    return;
-                }
-
-                onImport(transactions);
-                setSuccess(`Successfully imported ${transactions.length} transactions!`);
-
-                setTimeout(() => {
-                    onClose();
-                }, 2000);
+                processCSV(text);
             } catch (err) {
                 setError('Error parsing CSV file. Please check the format.');
             }
         };
         reader.readAsText(file);
+    };
+
+    const handleSaveNewAccount = (name: string, type: string) => {
+        const isDebtType = type === 'Credit Card' || type === 'Loan';
+
+        if (isDebtType) {
+            onAddDebt({
+                accountType: 'debt',
+                name,
+                type,
+                balance: 0,
+                interestRate: 0,
+                minPayment: 0,
+                originalBalance: 0,
+                status: 'Active',
+                lastUpdated: 'just now',
+                icon: type === 'Credit Card' ? 'CreditCardIcon' : 'LoanIcon',
+                color: 'bg-gray-700'
+            });
+
+            // Wait for state update
+            setTimeout(() => {
+                const newDebt = debts[debts.length - 1];
+                if (newDebt) {
+                    setAccountMappings(prev => new Map(prev).set(pendingAccountName.toLowerCase(), newDebt.id!));
+                }
+                setShowAccountMapping(false);
+
+                // Continue processing
+                setTimeout(() => {
+                    if (pendingTransactions.length > 0) {
+                        const reader = new FileReader();
+                        const csvContent = reconstructCSV(pendingTransactions);
+                        processCSV(csvContent);
+                    }
+                }, 100);
+            }, 100);
+        } else {
+            onAddAsset({
+                accountType: 'asset',
+                name,
+                type,
+                balance: 0,
+                interestRate: 0,
+                status: 'Active',
+                lastUpdated: 'just now',
+                icon: 'AccountsIcon',
+                color: 'bg-green-500',
+                holdings: []
+            });
+
+            // Wait for state update
+            setTimeout(() => {
+                const newAsset = assets[assets.length - 1];
+                if (newAsset) {
+                    setAccountMappings(prev => new Map(prev).set(pendingAccountName.toLowerCase(), newAsset.id!));
+                }
+                setShowAccountMapping(false);
+
+                // Continue processing
+                setTimeout(() => {
+                    if (pendingTransactions.length > 0) {
+                        const csvContent = reconstructCSV(pendingTransactions);
+                        processCSV(csvContent);
+                    }
+                }, 100);
+            }, 100);
+        }
+    };
+
+    const handleSelectExisting = (accountId: string) => {
+        setAccountMappings(prev => new Map(prev).set(pendingAccountName.toLowerCase(), accountId));
+        setShowAccountMapping(false);
+
+        // Continue processing
+        setTimeout(() => {
+            if (pendingTransactions.length > 0) {
+                const csvContent = reconstructCSV(pendingTransactions);
+                processCSV(csvContent);
+            }
+        }, 100);
+    };
+
+    const handleCancelMapping = () => {
+        // Skip transactions for this account
+        const filteredTransactions = pendingTransactions.filter(
+            tx => tx.account?.toLowerCase() !== pendingAccountName.toLowerCase()
+        );
+        setPendingTransactions(filteredTransactions);
+        setShowAccountMapping(false);
+
+        if (filteredTransactions.length > 0) {
+            setTimeout(() => {
+                const csvContent = reconstructCSV(filteredTransactions);
+                processCSV(csvContent);
+            }, 100);
+        } else {
+            setError('No transactions remaining after skipping unmapped accounts');
+        }
+    };
+
+    const reconstructCSV = (transactions: any[]) => {
+        const headers = 'Date,Merchant,Category,Amount,Account,Type';
+        const rows = transactions.map(tx =>
+            `"${tx.date}","${tx.merchant}","${tx.category}","${tx.amount}","${tx.account}","${tx.type}"`
+        );
+        return [headers, ...rows].join('\n');
     };
 
     const handleDrop = (e: React.DragEvent) => {
@@ -400,14 +644,15 @@ const ImportDataModal: React.FC<{isOpen: boolean, onClose: () => void, onImport:
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" onClick={onClose}>
-            <div className="bg-card-bg rounded-lg shadow-xl w-full max-w-2xl border border-border-color" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center p-6 border-b border-border-color">
-                    <h2 className="text-2xl font-bold text-white">Import Data from CSV</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white">
-                        <CloseIcon className="w-6 h-6" />
-                    </button>
-                </div>
+        <>
+            <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" onClick={onClose}>
+                <div className="bg-card-bg rounded-lg shadow-xl w-full max-w-2xl border border-border-color" onClick={e => e.stopPropagation()}>
+                    <div className="flex justify-between items-center p-6 border-b border-border-color">
+                        <h2 className="text-2xl font-bold text-white">Import Data from CSV</h2>
+                        <button onClick={onClose} className="text-gray-400 hover:text-white">
+                            <CloseIcon className="w-6 h-6" />
+                        </button>
+                    </div>
                 <div className="p-6">
                     <div
                         className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${
@@ -457,6 +702,16 @@ const ImportDataModal: React.FC<{isOpen: boolean, onClose: () => void, onImport:
                 </div>
             </div>
         </div>
+
+            <AccountMappingModal
+                isOpen={showAccountMapping}
+                onClose={handleCancelMapping}
+                accountName={pendingAccountName}
+                onSaveNew={handleSaveNewAccount}
+                onSelectExisting={handleSelectExisting}
+                existingAccounts={[...assets, ...debts]}
+            />
+        </>
     );
 };
 
@@ -664,7 +919,7 @@ const ToggleSwitch: React.FC<{ enabled: boolean; onToggle: () => void }> = ({ en
 );
 
 const Settings: React.FC<SettingsProps> = (props) => {
-    const { categories, onAddCategory, onUpdateCategory, onDeleteCategory, rules, onAddRule, onDeleteRule, onWipeData, notificationsEnabled, onToggleNotifications, autoCategorize, onToggleAutoCategorize, smartSuggestions, onToggleSmartSuggestions, assets, debts, onImportTransactions } = props;
+    const { categories, onAddCategory, onUpdateCategory, onDeleteCategory, rules, onAddRule, onDeleteRule, onWipeData, notificationsEnabled, onToggleNotifications, autoCategorize, onToggleAutoCategorize, smartSuggestions, onToggleSmartSuggestions, assets, debts, onImportTransactions, onAddAsset, onAddDebt } = props;
     const [isCatModalOpen, setIsCatModalOpen] = useState(false);
     const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
     const [isWipeModalOpen, setIsWipeModalOpen] = useState(false);
@@ -680,7 +935,7 @@ const Settings: React.FC<SettingsProps> = (props) => {
             <TransactionRulesModal isOpen={isRulesModalOpen} onClose={() => setIsRulesModalOpen(false)} rules={rules} categories={categories} onAddRule={onAddRule} onDeleteRule={onDeleteRule} />
             <WipeDataModal isOpen={isWipeModalOpen} onClose={() => setIsWipeModalOpen(false)} onWipe={onWipeData} />
             <ExportDataModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} assets={assets} debts={debts} />
-            <ImportDataModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onImport={onImportTransactions} assets={assets} debts={debts} />
+            <ImportDataModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onImport={onImportTransactions} onAddAsset={onAddAsset} onAddDebt={onAddDebt} assets={assets} debts={debts} />
 
             <div className="space-y-8 max-w-4xl mx-auto">
                 <h1 className="text-3xl font-bold text-white">Settings</h1>

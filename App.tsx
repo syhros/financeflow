@@ -451,9 +451,17 @@ const App: React.FC = () => {
                 alert("Transactions older than 6 months have been deleted.");
                 break;
             case 'resetAccounts':
-                setAssets(mockAssets);
-                setDebts(mockDebts);
-                alert("All accounts have been reset to their default state.");
+                // Reset all account balances to £0 while keeping the accounts
+                setAssets(prev => prev.map(asset => ({ ...asset, balance: 0 })));
+                setDebts(prev => prev.map(debt => ({ ...debt, balance: 0 })));
+                alert("All account balances have been reset to £0.");
+                break;
+            case 'deleteAndResetBalances':
+                // Delete all transactions and reset balances to £0
+                setTransactions([]);
+                setAssets(prev => prev.map(asset => ({ ...asset, balance: 0 })));
+                setDebts(prev => prev.map(debt => ({ ...debt, balance: 0 })));
+                alert("All transactions deleted and account balances reset to £0.");
                 break;
             case 'fullReset':
                 setAssets(mockAssets); setDebts(mockDebts); setGoals(mockGoals); setBills(mockBills);
@@ -515,6 +523,8 @@ const App: React.FC = () => {
                             smartSuggestions={smartSuggestions} onToggleSmartSuggestions={() => setSmartSuggestions(prev => !prev)}
                             assets={assets} debts={debts}
                             onImportTransactions={handleImportTransactions}
+                            onAddAsset={handleAddAsset}
+                            onAddDebt={handleAddDebt}
                         />;
             default:
                 return <Dashboard
