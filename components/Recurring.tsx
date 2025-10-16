@@ -12,6 +12,7 @@ interface RecurringProps {
     debts: Debt[];
     onAddPayment: (payment: Omit<RecurringPayment, 'id'>) => void;
     onUpdatePayment: (payment: RecurringPayment) => void;
+    onDeletePayment: (paymentId: string) => void;
     user: User;
     notifications: Notification[];
     onUpdateUser: (user: User) => void;
@@ -71,7 +72,7 @@ const calculateNextPaymentDate = (payment: RecurringPayment): Date => {
     return nextDate;
 };
 
-const AddEditRecurringModal: React.FC<{ isOpen: boolean; onClose: () => void; payment?: RecurringPayment; assets: Asset[]; debts: Debt[]; onSave: (payment: any) => void; }> = ({ isOpen, onClose, payment, assets, debts, onSave }) => {
+const AddEditRecurringModal: React.FC<{ isOpen: boolean; onClose: () => void; payment?: RecurringPayment; assets: Asset[]; debts: Debt[]; onSave: (payment: any) => void; onDelete?: (paymentId: string) => void; }> = ({ isOpen, onClose, payment, assets, debts, onSave, onDelete }) => {
     const [formData, setFormData] = useState<any>({});
     const { currency } = useCurrency();
     const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
@@ -97,6 +98,13 @@ const AddEditRecurringModal: React.FC<{ isOpen: boolean; onClose: () => void; pa
     const handleSave = () => {
         onSave(formData);
         onClose();
+    };
+
+    const handleDelete = () => {
+        if (window.confirm(`Are you sure you want to delete the recurring payment "${payment?.name}"?`)) {
+            onDelete?.(payment!.id);
+            onClose();
+        }
     };
 
     const commonInputStyles = "w-full bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-primary outline-none transition-colors";
@@ -153,7 +161,13 @@ const AddEditRecurringModal: React.FC<{ isOpen: boolean; onClose: () => void; pa
                  {formData.type !== 'Transfer' && <div><label htmlFor="category" className={labelStyles}>Category (Optional)</label><input type="text" id="category" value={formData.category || ''} onChange={handleChange} placeholder="e.g., Housing, Transportation" className={commonInputStyles} /></div>}
                 <div><label htmlFor="description" className={labelStyles}>Description (Optional)</label><textarea id="description" value={formData.description || ''} onChange={handleChange} placeholder="Additional notes about this payment..." className={`${commonInputStyles} h-24 resize-none`}></textarea></div>
 
-                <div className="flex gap-4 pt-4"><button className="w-full py-3 bg-gray-700 text-white rounded-full font-semibold hover:bg-gray-600 transition-colors" onClick={onClose}>Cancel</button><button onClick={handleSave} className="w-full py-3 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-500 transition-colors">{payment ? 'Update Payment' : 'Add Payment'}</button></div>
+                <div className="flex gap-4 pt-4">
+                    {payment && onDelete && (
+                        <button onClick={handleDelete} className="py-3 px-6 bg-red-600 text-white rounded-full font-semibold hover:bg-red-500 transition-colors">Delete</button>
+                    )}
+                    <button className="flex-1 py-3 bg-gray-700 text-white rounded-full font-semibold hover:bg-gray-600 transition-colors" onClick={onClose}>Cancel</button>
+                    <button onClick={handleSave} className="flex-1 py-3 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-500 transition-colors">{payment ? 'Update Payment' : 'Add Payment'}</button>
+                </div>
             </div>
         </Modal>
     );
@@ -193,7 +207,7 @@ const PaymentListItem: React.FC<{ payment: RecurringPayment; assets: Asset[]; de
     )
 }
 
-const Recurring: React.FC<RecurringProps> = ({ payments, assets, debts, onAddPayment, onUpdatePayment, user, notifications, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
+const Recurring: React.FC<RecurringProps> = ({ payments, assets, debts, onAddPayment, onUpdatePayment, onDeletePayment, user, notifications, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedPayment, setSelectedPayment] = useState<RecurringPayment | undefined>(undefined);
     const [sort, setSort] = useState('date-asc');
@@ -309,7 +323,7 @@ const Recurring: React.FC<RecurringProps> = ({ payments, assets, debts, onAddPay
 
     return (
         <>
-        <AddEditRecurringModal isOpen={isModalOpen} onClose={handleCloseModal} payment={selectedPayment} assets={assets} debts={debts} onSave={handleSave} />
+        <AddEditRecurringModal isOpen={isModalOpen} onClose={handleCloseModal} payment={selectedPayment} assets={assets} debts={debts} onSave={handleSave} onDelete={onDeletePayment} />
         <div className="max-w-7xl mx-auto space-y-8">
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold text-white">Recurring Payments</h1>

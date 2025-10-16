@@ -11,6 +11,7 @@ interface BillsProps {
     assets: Asset[];
     onAddBill: (bill: Omit<Bill, 'id'>) => void;
     onUpdateBill: (bill: Bill) => void;
+    onDeleteBill: (billId: string) => void;
     highlightedItemId: string | null;
     setHighlightedItemId: (id: string | null) => void;
     user: User;
@@ -39,7 +40,7 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; chi
     );
 };
 
-const AddEditBillModal: React.FC<{ isOpen: boolean; onClose: () => void; bill?: Bill; assets: Asset[], onSave: (bill: any) => void; }> = ({ isOpen, onClose, bill, assets, onSave }) => {
+const AddEditBillModal: React.FC<{ isOpen: boolean; onClose: () => void; bill?: Bill; assets: Asset[], onSave: (bill: any) => void; onDelete?: (billId: string) => void; }> = ({ isOpen, onClose, bill, assets, onSave, onDelete }) => {
     const [formData, setFormData] = useState<any>({});
     const { currency } = useCurrency();
     const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
@@ -70,6 +71,13 @@ const AddEditBillModal: React.FC<{ isOpen: boolean; onClose: () => void; bill?: 
     const handleSave = () => {
         onSave(formData);
         onClose();
+    };
+
+    const handleDelete = () => {
+        if (window.confirm(`Are you sure you want to delete the bill "${bill?.name}"?`)) {
+            onDelete?.(bill!.id);
+            onClose();
+        }
     };
 
     const commonInputStyles = "w-full bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-primary outline-none transition-colors";
@@ -125,8 +133,11 @@ const AddEditBillModal: React.FC<{ isOpen: boolean; onClose: () => void; bill?: 
                     </select>
                 </div>
                 <div className="flex gap-4 pt-4">
-                    <button className="w-full py-3 bg-gray-700 text-white rounded-full font-semibold hover:bg-gray-600 transition-colors" onClick={onClose}>Cancel</button>
-                    <button onClick={handleSave} className="w-full py-3 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-500 transition-colors">{bill ? 'Update Bill' : 'Add Bill'}</button>
+                    {bill && onDelete && (
+                        <button onClick={handleDelete} className="py-3 px-6 bg-red-600 text-white rounded-full font-semibold hover:bg-red-500 transition-colors">Delete</button>
+                    )}
+                    <button className="flex-1 py-3 bg-gray-700 text-white rounded-full font-semibold hover:bg-gray-600 transition-colors" onClick={onClose}>Cancel</button>
+                    <button onClick={handleSave} className="flex-1 py-3 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-500 transition-colors">{bill ? 'Update Bill' : 'Add Bill'}</button>
                 </div>
             </div>
         </Modal>
@@ -171,7 +182,7 @@ const BillListItem: React.FC<{ bill: Bill; assets: Asset[]; onEdit: (bill: Bill)
     );
 };
 
-const Bills: React.FC<BillsProps> = ({ bills, assets, onAddBill, onUpdateBill, highlightedItemId, setHighlightedItemId, user, notifications, debts, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
+const Bills: React.FC<BillsProps> = ({ bills, assets, onAddBill, onUpdateBill, onDeleteBill, highlightedItemId, setHighlightedItemId, user, notifications, debts, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedBill, setSelectedBill] = useState<Bill | undefined>(undefined);
     const [sort, setSort] = useState('date-asc');
@@ -260,7 +271,7 @@ const Bills: React.FC<BillsProps> = ({ bills, assets, onAddBill, onUpdateBill, h
     
     return (
         <>
-            <AddEditBillModal isOpen={isModalOpen} onClose={handleCloseModal} bill={selectedBill} assets={assets} onSave={handleSave} />
+            <AddEditBillModal isOpen={isModalOpen} onClose={handleCloseModal} bill={selectedBill} assets={assets} onSave={handleSave} onDelete={onDeleteBill} />
             <div className="max-w-7xl mx-auto space-y-8">
                 <div className="flex justify-between items-center">
                     <h1 className="text-3xl font-bold text-white">Bills & Subscriptions</h1>

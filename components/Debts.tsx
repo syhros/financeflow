@@ -10,6 +10,7 @@ interface DebtsProps {
     debts: Debt[];
     onAddDebt: (debt: Omit<Debt, 'id'>) => void;
     onUpdateDebt: (debt: Debt, oldBalance?: number) => void;
+    onDeleteDebt: (debtId: string) => void;
     onAddTransaction?: (transaction: Omit<Transaction, 'id'>) => void;
     transactions?: Transaction[];
     user: User;
@@ -38,7 +39,7 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; chi
     );
 };
 
-const AddEditDebtModal: React.FC<{ isOpen: boolean; onClose: () => void; debt?: Debt; onSave: (debt: any, oldBalance?: number) => void;}> = ({ isOpen, onClose, debt, onSave }) => {
+const AddEditDebtModal: React.FC<{ isOpen: boolean; onClose: () => void; debt?: Debt; onSave: (debt: any, oldBalance?: number) => void; onDelete?: (debtId: string) => void; }> = ({ isOpen, onClose, debt, onSave, onDelete }) => {
     const [formData, setFormData] = useState<any>({});
     const [originalBalance, setOriginalBalance] = useState<number>(0);
     const [promoEnabled, setPromoEnabled] = useState(false);
@@ -88,6 +89,13 @@ const AddEditDebtModal: React.FC<{ isOpen: boolean; onClose: () => void; debt?: 
         }
         onSave(dataToSave, originalBalance);
         onClose();
+    };
+
+    const handleDelete = () => {
+        if (window.confirm(`Are you sure you want to delete "${debt?.name}"? This will also delete all associated transactions.`)) {
+            onDelete?.(debt!.id);
+            onClose();
+        }
     };
     
     const commonInputStyles = "w-full bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-primary outline-none transition-colors";
@@ -160,8 +168,11 @@ const AddEditDebtModal: React.FC<{ isOpen: boolean; onClose: () => void; debt?: 
                 )}
                 
                 <div className="flex gap-4 pt-4">
-                    <button className="w-full py-3 bg-gray-700 text-white rounded-full font-semibold hover:bg-gray-600 transition-colors" onClick={onClose}>Cancel</button>
-                    <button onClick={handleSave} className="w-full py-3 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-500 transition-colors">{debt ? 'Update Debt' : 'Add Debt'}</button>
+                    {debt && onDelete && (
+                        <button onClick={handleDelete} className="py-3 px-6 bg-red-600 text-white rounded-full font-semibold hover:bg-red-500 transition-colors">Delete</button>
+                    )}
+                    <button className="flex-1 py-3 bg-gray-700 text-white rounded-full font-semibold hover:bg-gray-600 transition-colors" onClick={onClose}>Cancel</button>
+                    <button onClick={handleSave} className="flex-1 py-3 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-500 transition-colors">{debt ? 'Update Debt' : 'Add Debt'}</button>
                 </div>
             </div>
         </Modal>
@@ -267,7 +278,7 @@ const DebtAccountCard: React.FC<{ debt: Debt; onEdit: (acc: Debt) => void; onCli
     );
 };
 
-const Debts: React.FC<DebtsProps> = ({ debts, onAddDebt, onUpdateDebt, onAddTransaction, transactions = [], user, notifications, assets, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
+const Debts: React.FC<DebtsProps> = ({ debts, onAddDebt, onUpdateDebt, onDeleteDebt, onAddTransaction, transactions = [], user, notifications, assets, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingDebt, setEditingDebt] = useState<Debt | undefined>(undefined);
     const [showClosed, setShowClosed] = useState(false);
@@ -328,7 +339,7 @@ const Debts: React.FC<DebtsProps> = ({ debts, onAddDebt, onUpdateDebt, onAddTran
 
     return (
         <>
-            <AddEditDebtModal isOpen={isModalOpen} onClose={handleCloseModal} debt={editingDebt} onSave={handleSave} />
+            <AddEditDebtModal isOpen={isModalOpen} onClose={handleCloseModal} debt={editingDebt} onSave={handleSave} onDelete={onDeleteDebt} />
             <div className="max-w-7xl mx-auto space-y-8">
                 <div className="flex justify-between items-center">
                     <h1 className="text-3xl font-bold text-white">Debts</h1>

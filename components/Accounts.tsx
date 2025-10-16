@@ -12,6 +12,7 @@ interface AccountsProps {
     marketData: MarketData;
     onAddAsset: (asset: Omit<Asset, 'id'>) => void;
     onUpdateAsset: (asset: Asset, oldBalance?: number) => void;
+    onDeleteAsset: (assetId: string) => void;
     onAddTransaction?: (transaction: Omit<Transaction, 'id'>) => void;
     transactions: Transaction[];
     user: User;
@@ -40,7 +41,7 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; chi
     );
 };
 
-const AddEditAccountModal: React.FC<{ isOpen: boolean; onClose: () => void; asset?: Asset; onSave: (asset: any, oldBalance?: number) => void; marketData: MarketData; }> = ({ isOpen, onClose, asset, onSave, marketData }) => {
+const AddEditAccountModal: React.FC<{ isOpen: boolean; onClose: () => void; asset?: Asset; onSave: (asset: any, oldBalance?: number) => void; onDelete?: (assetId: string) => void; marketData: MarketData; }> = ({ isOpen, onClose, asset, onSave, onDelete, marketData }) => {
     const [formData, setFormData] = useState<any>({});
     const [originalBalance, setOriginalBalance] = useState<number>(0);
     const { formatCurrency, currency } = useCurrency();
@@ -74,6 +75,13 @@ const AddEditAccountModal: React.FC<{ isOpen: boolean; onClose: () => void; asse
     const handleSave = () => {
         onSave(formData, originalBalance);
         onClose();
+    };
+
+    const handleDelete = () => {
+        if (window.confirm(`Are you sure you want to delete "${asset?.name}"? This will also delete all associated transactions.`)) {
+            onDelete?.(asset!.id);
+            onClose();
+        }
     };
 
     const commonInputStyles = "w-full bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-primary outline-none transition-colors";
@@ -157,8 +165,11 @@ const AddEditAccountModal: React.FC<{ isOpen: boolean; onClose: () => void; asse
                     )}
                     
                     <div className="flex gap-4 pt-4">
-                        <button className="w-full py-3 bg-gray-700 text-white rounded-full font-semibold hover:bg-gray-600 transition-colors" onClick={onClose}>Cancel</button>
-                        <button onClick={handleSave} className="w-full py-3 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-500 transition-colors">{asset ? 'Update Account' : 'Add Account'}</button>
+                        {asset && onDelete && (
+                            <button onClick={handleDelete} className="py-3 px-6 bg-red-600 text-white rounded-full font-semibold hover:bg-red-500 transition-colors">Delete</button>
+                        )}
+                        <button className="flex-1 py-3 bg-gray-700 text-white rounded-full font-semibold hover:bg-gray-600 transition-colors" onClick={onClose}>Cancel</button>
+                        <button onClick={handleSave} className="flex-1 py-3 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-500 transition-colors">{asset ? 'Update Account' : 'Add Account'}</button>
                     </div>
                 </div>
             </div>
@@ -195,7 +206,7 @@ const AssetAccountCard: React.FC<{ asset: Asset; onEdit: (acc: Asset) => void; o
     );
 };
 
-const Accounts: React.FC<AccountsProps> = ({ assets, marketData, onAddAsset, onUpdateAsset, onAddTransaction, transactions = [], user, notifications, debts, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
+const Accounts: React.FC<AccountsProps> = ({ assets, marketData, onAddAsset, onUpdateAsset, onDeleteAsset, onAddTransaction, transactions = [], user, notifications, debts, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingAsset, setEditingAsset] = useState<Asset | undefined>(undefined);
     const [showClosed, setShowClosed] = useState(false);
@@ -255,7 +266,7 @@ const Accounts: React.FC<AccountsProps> = ({ assets, marketData, onAddAsset, onU
 
     return (
         <>
-            <AddEditAccountModal isOpen={isModalOpen} onClose={handleCloseModal} asset={editingAsset} onSave={handleSave} marketData={marketData} />
+            <AddEditAccountModal isOpen={isModalOpen} onClose={handleCloseModal} asset={editingAsset} onSave={handleSave} onDelete={onDeleteAsset} marketData={marketData} />
             <div className="max-w-7xl mx-auto space-y-8">
                 <div className="flex justify-between items-center">
                     <h1 className="text-3xl font-bold text-white">Accounts (Assets)</h1>

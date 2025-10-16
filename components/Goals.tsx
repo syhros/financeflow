@@ -11,6 +11,7 @@ interface GoalsProps {
     assets: Asset[];
     onAddGoal: (goal: Omit<Goal, 'id'>) => void;
     onUpdateGoal: (goal: Goal) => void;
+    onDeleteGoal: (goalId: string) => void;
     highlightedItemId: string | null;
     setHighlightedItemId: (id: string | null) => void;
     user: User;
@@ -39,7 +40,7 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; chi
     );
 };
 
-const AddEditGoalModal: React.FC<{ isOpen: boolean; onClose: () => void; goal?: Goal; assets: Asset[]; onSave: (goal: any) => void; }> = ({ isOpen, onClose, goal, assets, onSave }) => {
+const AddEditGoalModal: React.FC<{ isOpen: boolean; onClose: () => void; goal?: Goal; assets: Asset[]; onSave: (goal: any) => void; onDelete?: (goalId: string) => void; }> = ({ isOpen, onClose, goal, assets, onSave, onDelete }) => {
     const [formData, setFormData] = useState<any>({});
     const { formatCurrency, currency } = useCurrency();
     const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
@@ -92,6 +93,13 @@ const AddEditGoalModal: React.FC<{ isOpen: boolean; onClose: () => void; goal?: 
     const handleSave = () => {
         onSave(formData);
         onClose();
+    };
+
+    const handleDelete = () => {
+        if (window.confirm(`Are you sure you want to delete the goal "${goal?.name}"?`)) {
+            onDelete?.(goal!.id);
+            onClose();
+        }
     };
 
     const totalSaved = useMemo(() => {
@@ -184,8 +192,11 @@ const AddEditGoalModal: React.FC<{ isOpen: boolean; onClose: () => void; goal?: 
                 </div>
             </div>
             <div className="flex gap-4 pt-6 border-t border-border-color mt-6">
-                <button className="w-full py-3 bg-gray-700 text-white rounded-full font-semibold hover:bg-gray-600 transition-colors" onClick={onClose}>Cancel</button>
-                <button onClick={handleSave} className="w-full py-3 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-500 transition-colors">{goal ? 'Update Goal' : 'Add Goal'}</button>
+                {goal && onDelete && (
+                    <button onClick={handleDelete} className="py-3 px-6 bg-red-600 text-white rounded-full font-semibold hover:bg-red-500 transition-colors">Delete</button>
+                )}
+                <button className="flex-1 py-3 bg-gray-700 text-white rounded-full font-semibold hover:bg-gray-600 transition-colors" onClick={onClose}>Cancel</button>
+                <button onClick={handleSave} className="flex-1 py-3 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-500 transition-colors">{goal ? 'Update Goal' : 'Add Goal'}</button>
             </div>
         </Modal>
     );
@@ -248,7 +259,7 @@ const GoalCard: React.FC<{ goal: Goal; assets: Asset[]; onEdit: (goal: Goal) => 
 };
 
 
-const Goals: React.FC<GoalsProps> = ({ goals, assets, onAddGoal, onUpdateGoal, highlightedItemId, setHighlightedItemId, user, notifications, debts, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
+const Goals: React.FC<GoalsProps> = ({ goals, assets, onAddGoal, onUpdateGoal, onDeleteGoal, highlightedItemId, setHighlightedItemId, user, notifications, debts, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedGoal, setSelectedGoal] = useState<Goal | undefined>(undefined);
 
@@ -281,7 +292,7 @@ const Goals: React.FC<GoalsProps> = ({ goals, assets, onAddGoal, onUpdateGoal, h
 
     return (
         <>
-        <AddEditGoalModal isOpen={isModalOpen} onClose={handleCloseModal} goal={selectedGoal} assets={assets} onSave={handleSave} />
+        <AddEditGoalModal isOpen={isModalOpen} onClose={handleCloseModal} goal={selectedGoal} assets={assets} onSave={handleSave} onDelete={onDeleteGoal} />
         <div className="max-w-7xl mx-auto space-y-8">
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold text-white">Goals</h1>
