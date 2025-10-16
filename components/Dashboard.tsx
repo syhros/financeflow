@@ -54,7 +54,7 @@ const AccountSelectionModal: React.FC<{
             setSelectedAssetIds(selectedAssetIds.filter(aid => aid !== id));
         } else {
             const total = selectedAssetIds.length + 1 + selectedDebtIds.length;
-            if (total <= 6) {
+            if (total <= 7) {
                 setSelectedAssetIds([...selectedAssetIds, id]);
             }
         }
@@ -65,7 +65,7 @@ const AccountSelectionModal: React.FC<{
             setSelectedDebtIds(selectedDebtIds.filter(did => did !== id));
         } else {
             const total = selectedAssetIds.length + selectedDebtIds.length + 1;
-            if (total <= 6) {
+            if (total <= 7) {
                 setSelectedDebtIds([...selectedDebtIds, id]);
             }
         }
@@ -119,8 +119,8 @@ const AccountSelectionModal: React.FC<{
                                         const val = parseInt(e.target.value);
                                         if (val + debtCount <= 6) setAssetCount(val);
                                     }} className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-primary outline-none">
-                                        {[0, 1, 2, 3, 4, 5, 6].map(n => (
-                                            <option key={n} value={n} disabled={n + debtCount > 6}>{n}</option>
+                                        {[0, 1, 2, 3, 4, 5, 6, 7].map(n => (
+                                            <option key={n} value={n} disabled={n + debtCount > 7}>{n}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -130,8 +130,8 @@ const AccountSelectionModal: React.FC<{
                                         const val = parseInt(e.target.value);
                                         if (assetCount + val <= 6) setDebtCount(val);
                                     }} className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-primary outline-none">
-                                        {[0, 1, 2, 3, 4, 5, 6].map(n => (
-                                            <option key={n} value={n} disabled={assetCount + n > 6}>{n}</option>
+                                        {[0, 1, 2, 3, 4, 5, 6, 7].map(n => (
+                                            <option key={n} value={n} disabled={assetCount + n > 7}>{n}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -140,7 +140,7 @@ const AccountSelectionModal: React.FC<{
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            <p className="text-sm text-gray-400">Select up to 6 accounts to display on your dashboard. {totalSelected}/6 selected</p>
+                            <p className="text-sm text-gray-400">Select up to 7 accounts to display on your dashboard. {totalSelected}/7 selected</p>
 
                             <div>
                                 <h3 className="text-lg font-semibold text-white mb-3">Regular Accounts</h3>
