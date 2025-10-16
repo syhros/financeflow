@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Card from './Card';
-import { Transaction, Asset, Budgets, Category } from '../types';
+import { Transaction, Asset, Debt, Budgets, Category } from '../types';
 import { BudgetDoughnut } from './charts';
 import { PlusIcon, PencilIcon, CloseIcon } from './icons';
 import { format } from 'date-fns';
@@ -9,6 +9,7 @@ import { useCurrency } from '../App';
 interface TransactionsProps {
     transactions: Transaction[];
     assets: Asset[];
+    debts: Debt[];
     budgets: Budgets;
     categories: Category[];
     onAddTransaction: (transaction: Omit<Transaction, 'id'>) => void;
@@ -31,7 +32,7 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; chi
     );
 };
 
-const AddEditTransactionModal: React.FC<{ isOpen: boolean; onClose: () => void; transaction?: Transaction; assets: Asset[]; categories: Category[]; onSave: (transaction: any) => void; }> = ({ isOpen, onClose, transaction, assets, categories, onSave }) => {
+const AddEditTransactionModal: React.FC<{ isOpen: boolean; onClose: () => void; transaction?: Transaction; assets: Asset[]; debts: Debt[]; categories: Category[]; onSave: (transaction: any) => void; }> = ({ isOpen, onClose, transaction, assets, debts, categories, onSave }) => {
     const [formData, setFormData] = useState<any>({});
     const { currency } = useCurrency();
     const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
@@ -137,7 +138,12 @@ const AddEditTransactionModal: React.FC<{ isOpen: boolean; onClose: () => void; 
                             <label htmlFor="accountId" className={labelStyles}>Account</label>
                             <select id="accountId" value={formData.accountId || ''} onChange={handleChange} className={commonInputStyles}>
                                 <option value="">Select Account</option>
-                                {cashAccounts.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
+                                <optgroup label="Regular Accounts">
+                                    {cashAccounts.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
+                                </optgroup>
+                                <optgroup label="Debt Accounts">
+                                    {debts.filter(d => d.status === 'Active').map(debt => <option key={debt.id} value={debt.id}>{debt.name}</option>)}
+                                </optgroup>
                             </select>
                         </div>
                     </>
@@ -214,7 +220,7 @@ const TransactionItem: React.FC<{ tx: Transaction, onEdit: (tx: Transaction) => 
     );
 }
 
-const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, budgets, categories, onAddTransaction, onUpdateTransaction, onUpdateBudgets }) => {
+const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts, budgets, categories, onAddTransaction, onUpdateTransaction, onUpdateBudgets }) => {
     const [filter, setFilter] = useState<'all' | 'expense' | 'income' | 'investing'>('all');
     const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
     const [chartView, setChartView] = useState<'expense' | 'income'>('expense');
@@ -301,7 +307,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, budge
 
     return (
         <>
-        <AddEditTransactionModal isOpen={isTxModalOpen} onClose={() => setIsTxModalOpen(false)} transaction={editingTx} assets={assets} categories={categories} onSave={handleSaveTransaction} />
+        <AddEditTransactionModal isOpen={isTxModalOpen} onClose={() => setIsTxModalOpen(false)} transaction={editingTx} assets={assets} debts={debts} categories={categories} onSave={handleSaveTransaction} />
         <EditBudgetsModal isOpen={isBudgetModalOpen} onClose={() => setIsBudgetModalOpen(false)} budgets={budgets} onSave={onUpdateBudgets} />
         <div className="max-w-7xl mx-auto space-y-8">
             <div className="flex justify-between items-center">

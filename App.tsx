@@ -423,7 +423,7 @@ const App: React.FC = () => {
                             onToggleTheme={handleToggleTheme}
                         />;
             case Page.Transactions:
-                return <Transactions transactions={transactions} assets={assets} budgets={budgets} categories={categories} onAddTransaction={handleAddTransaction} onUpdateTransaction={handleUpdateTransaction} onUpdateBudgets={handleUpdateBudgets} />;
+                return <Transactions transactions={transactions} assets={assets} debts={debts} budgets={budgets} categories={categories} onAddTransaction={handleAddTransaction} onUpdateTransaction={handleUpdateTransaction} onUpdateBudgets={handleUpdateBudgets} />;
             case Page.Accounts:
                 return <Accounts assets={assets} marketData={marketData} onAddAsset={handleAddAsset} onUpdateAsset={handleUpdateAsset} onAddTransaction={handleAddTransaction} />;
             case Page.Debts:

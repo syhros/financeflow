@@ -20,6 +20,15 @@ export interface User {
     username: string;
     email: string;
     avatarUrl: string;
+    accountSelection?: {
+        mode: 'automatic' | 'manual';
+        selectedAssetIds: string[];
+        selectedDebtIds: string[];
+        automaticCounts: {
+            assets: number;
+            debts: number;
+        };
+    };
 }
 
 export type NotificationType = 'Bill' | 'Goal' | 'Summary' | 'Info';
