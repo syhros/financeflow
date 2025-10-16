@@ -145,11 +145,11 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                         <div className="space-y-4">
                             <div className="p-5 bg-gray-700/50 rounded-lg border border-gray-600">
                                 <p className="text-gray-400 text-sm mb-1">Current Balance</p>
-                                <p className="text-3xl font-bold text-white">{formatCurrency(account.balance)}</p>
+                                <p className={`text-3xl font-bold ${accountType === 'debt' ? 'text-red-300' : 'text-white'}`}>{formatCurrency(account.balance)}</p>
                             </div>
 
                             <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/30">
-                                <p className="text-gray-400 text-sm mb-1">Total Income</p>
+                                <p className="text-gray-400 text-sm mb-1">{accountType === 'debt' ? 'Total Payments' : 'Total Income'}</p>
                                 <p className="text-2xl font-bold text-green-400">+{formatCurrency(metrics.totalIncome).replace(/[+-]/g, '')}</p>
                                 <p className="text-xs text-gray-500 mt-1">{accountTransactions.filter(t => t.type === 'income').length} transactions</p>
                             </div>
@@ -160,20 +160,13 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                 <p className="text-xs text-gray-500 mt-1">{accountTransactions.filter(t => t.type === 'expense').length} transactions</p>
                             </div>
 
-                            <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                                <p className="text-gray-400 text-sm mb-1">Net Change</p>
-                                <p className={`text-2xl font-bold ${metrics.netChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                    {metrics.netChange >= 0 ? '+' : ''}{formatCurrency(metrics.netChange)}
-                                </p>
-                                <p className="text-xs text-gray-500 mt-1">
-                                    {accountType === 'asset' ? 'Income minus expenses' : 'Expenses minus income'}
-                                </p>
-                            </div>
-
-                            {account.interestRate && account.interestRate > 0 && (
-                                <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                                    <p className="text-gray-400 text-sm mb-1">Interest Rate</p>
-                                    <p className="text-xl font-bold text-blue-400">{account.interestRate}% APY</p>
+                            {accountType === 'asset' && (
+                                <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                                    <p className="text-gray-400 text-sm mb-1">Net Change</p>
+                                    <p className={`text-2xl font-bold ${metrics.netChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                        {metrics.netChange >= 0 ? '+' : ''}{formatCurrency(metrics.netChange)}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1">Income minus expenses</p>
                                 </div>
                             )}
                         </div>

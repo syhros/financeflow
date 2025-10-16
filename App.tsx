@@ -234,18 +234,34 @@ const App: React.FC = () => {
         // Find the old transaction to calculate balance adjustment
         const oldTransaction = transactions.find(t => t.id === updatedTransaction.id);
 
-        if (oldTransaction && (oldTransaction.amount !== updatedTransaction.amount || oldTransaction.type !== updatedTransaction.type)) {
+        if (oldTransaction && (oldTransaction.amount !== updatedTransaction.amount || oldTransaction.type !== updatedTransaction.type || oldTransaction.accountId !== updatedTransaction.accountId)) {
+            const accountChanged = oldTransaction.accountId !== updatedTransaction.accountId;
+
             // Update assets
             setAssets(prevAssets => prevAssets.map(asset => {
+                // Handle old account (reverse the transaction)
                 if (asset.id === oldTransaction.accountId) {
                     let balance = asset.balance;
-                    // Reverse old transaction
                     if (oldTransaction.type === 'income') {
                         balance -= oldTransaction.amount;
                     } else if (oldTransaction.type === 'expense') {
                         balance += oldTransaction.amount;
                     }
-                    // Apply new transaction
+                    return { ...asset, balance };
+                }
+                // Handle new account (apply the transaction) - only if account changed
+                if (accountChanged && asset.id === updatedTransaction.accountId) {
+                    let balance = asset.balance;
+                    if (updatedTransaction.type === 'income') {
+                        balance += updatedTransaction.amount;
+                    } else if (updatedTransaction.type === 'expense') {
+                        balance -= updatedTransaction.amount;
+                    }
+                    return { ...asset, balance };
+                }
+                // If same account, just update with new values
+                if (!accountChanged && asset.id === updatedTransaction.accountId) {
+                    let balance = asset.balance;
                     if (updatedTransaction.type === 'income') {
                         balance += updatedTransaction.amount;
                     } else if (updatedTransaction.type === 'expense') {
@@ -258,15 +274,29 @@ const App: React.FC = () => {
 
             // Update debts
             setDebts(prevDebts => prevDebts.map(debt => {
+                // Handle old account (reverse the transaction)
                 if (debt.id === oldTransaction.accountId) {
                     let balance = debt.balance;
-                    // Reverse old transaction (for debts, income reduces debt, expense increases it)
                     if (oldTransaction.type === 'income') {
                         balance += oldTransaction.amount;
                     } else if (oldTransaction.type === 'expense') {
                         balance -= oldTransaction.amount;
                     }
-                    // Apply new transaction
+                    return { ...debt, balance };
+                }
+                // Handle new account (apply the transaction) - only if account changed
+                if (accountChanged && debt.id === updatedTransaction.accountId) {
+                    let balance = debt.balance;
+                    if (updatedTransaction.type === 'income') {
+                        balance -= updatedTransaction.amount;
+                    } else if (updatedTransaction.type === 'expense') {
+                        balance += updatedTransaction.amount;
+                    }
+                    return { ...debt, balance };
+                }
+                // If same account, just update with new values
+                if (!accountChanged && debt.id === updatedTransaction.accountId) {
+                    let balance = debt.balance;
                     if (updatedTransaction.type === 'income') {
                         balance -= updatedTransaction.amount;
                     } else if (updatedTransaction.type === 'expense') {

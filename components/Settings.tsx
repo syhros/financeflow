@@ -302,7 +302,7 @@ const WipeDataModal: React.FC<{ isOpen: boolean; onClose: () => void; onWipe: (o
     )
 }
 
-const ImportDataModal: React.FC<{isOpen: boolean, onClose: () => void, onImport: (transactions: Transaction[]) => void}> = ({isOpen, onClose, onImport}) => {
+const ImportDataModal: React.FC<{isOpen: boolean, onClose: () => void, onImport: (transactions: Transaction[]) => void, assets: Asset[], debts: Debt[]}> = ({isOpen, onClose, onImport, assets, debts}) => {
     const [isDragging, setIsDragging] = useState(false);
     const [error, setError] = useState<string>('');
     const [success, setSuccess] = useState<string>('');
@@ -331,6 +331,10 @@ const ImportDataModal: React.FC<{isOpen: boolean, onClose: () => void, onImport:
                 const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
                 const transactions: Transaction[] = [];
 
+                // Create account lookup by name
+                const allAccountsForImport = [...assets, ...debts];
+                const accountNameToId = new Map(allAccountsForImport.map(a => [a.name.toLowerCase(), a.id]));
+
                 for (let i = 1; i < lines.length; i++) {
                     const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
 
@@ -343,6 +347,13 @@ const ImportDataModal: React.FC<{isOpen: boolean, onClose: () => void, onImport:
 
                     // Convert to Transaction format
                     if (transaction.date && transaction.merchant && transaction.amount) {
+                        // Map account name to ID, fallback to first asset if not found
+                        let accountId = '1';
+                        if (transaction.account) {
+                            const foundId = accountNameToId.get(transaction.account.toLowerCase());
+                            accountId = foundId || (allAccountsForImport[0]?.id || '1');
+                        }
+
                         transactions.push({
                             id: `import-${Date.now()}-${i}`,
                             merchant: transaction.merchant,
@@ -350,7 +361,7 @@ const ImportDataModal: React.FC<{isOpen: boolean, onClose: () => void, onImport:
                             date: transaction.date,
                             amount: parseFloat(transaction.amount),
                             type: transaction.type || 'expense',
-                            accountId: transaction.account || '1',
+                            accountId: accountId,
                             logo: `https://logo.clearbit.com/${transaction.merchant.toLowerCase().replace(/\s+/g, '')}.com`
                         });
                     }
@@ -518,6 +529,9 @@ const ExportDataModal: React.FC<{isOpen: boolean, onClose: () => void, assets: A
             }
         });
 
+        // Get all accounts for name lookup
+        const allAccountsForExport = [...assets, ...debts];
+
         // Add data rows
         filteredTransactions.forEach((tx: any) => {
             const row = headers.map(field => {
@@ -526,7 +540,10 @@ const ExportDataModal: React.FC<{isOpen: boolean, onClose: () => void, assets: A
                     case 'Merchant': return `"${tx.merchant}"`;
                     case 'Category': return `"${tx.category}"`;
                     case 'Amount': return tx.amount;
-                    case 'Account': return `"${tx.accountId}"`;
+                    case 'Account': {
+                        const account = allAccountsForExport.find(a => a.id === tx.accountId);
+                        return `"${account?.name || tx.accountId}"`;
+                    }
                     case 'Type': return `"${tx.type}"`;
                     default: return '';
                 }
@@ -663,7 +680,7 @@ const Settings: React.FC<SettingsProps> = (props) => {
             <TransactionRulesModal isOpen={isRulesModalOpen} onClose={() => setIsRulesModalOpen(false)} rules={rules} categories={categories} onAddRule={onAddRule} onDeleteRule={onDeleteRule} />
             <WipeDataModal isOpen={isWipeModalOpen} onClose={() => setIsWipeModalOpen(false)} onWipe={onWipeData} />
             <ExportDataModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} assets={assets} debts={debts} />
-            <ImportDataModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onImport={onImportTransactions} />
+            <ImportDataModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onImport={onImportTransactions} assets={assets} debts={debts} />
 
             <div className="space-y-8 max-w-4xl mx-auto">
                 <h1 className="text-3xl font-bold text-white">Settings</h1>

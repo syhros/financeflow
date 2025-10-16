@@ -222,11 +222,29 @@ const EditBudgetsModal: React.FC<{ isOpen: boolean; onClose: () => void; budgets
 
 const TransactionItem: React.FC<{ tx: Transaction, onEdit: (tx: Transaction) => void, isSelecting?: boolean, isSelected?: boolean, onToggleSelect?: (txId: string) => void }> = ({ tx, onEdit, isSelecting, isSelected, onToggleSelect }) => {
     const { formatCurrency } = useCurrency();
+
+    const handleClick = () => {
+        if (isSelecting) {
+            onToggleSelect?.(tx.id);
+        }
+    };
+
     return (
-        <div className="flex items-center justify-between py-4">
+        <div
+            className={`flex items-center justify-between py-4 ${isSelecting ? 'cursor-pointer hover:bg-gray-700/30 rounded-lg px-2 -mx-2 transition-colors' : ''}`}
+            onClick={handleClick}
+        >
             <div className="flex items-center gap-3">
                 {isSelecting && (
-                    <input type="checkbox" checked={isSelected} onChange={() => onToggleSelect?.(tx.id)} className="w-5 h-5 rounded border-gray-500 text-primary focus:ring-primary" />
+                    <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(e) => {
+                            e.stopPropagation();
+                            onToggleSelect?.(tx.id);
+                        }}
+                        className="w-5 h-5 rounded border-gray-500 text-primary focus:ring-primary pointer-events-none"
+                    />
                 )}
                 <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-gray-700">
                     <img src={tx.logo} alt={tx.merchant} className="w-6 h-6 rounded-md" />
@@ -240,7 +258,7 @@ const TransactionItem: React.FC<{ tx: Transaction, onEdit: (tx: Transaction) => 
                 <p className={`font-bold ${tx.type === 'income' ? 'text-primary' : 'text-white'}`}>
                     {tx.type === 'income' ? '+' : tx.type === 'investing' ? '' : '-'}{formatCurrency(tx.amount).replace(/[+-]/g, '')}
                 </p>
-                {!isSelecting && <button onClick={() => onEdit(tx)} className="text-gray-500 hover:text-white"><PencilIcon className="w-4 h-4" /></button>}
+                {!isSelecting && <button onClick={(e) => { e.stopPropagation(); onEdit(tx); }} className="text-gray-500 hover:text-white"><PencilIcon className="w-4 h-4" /></button>}
             </div>
         </div>
     );
