@@ -220,8 +220,8 @@ export const generateIncomeExpenseData = (transactions: Transaction[], timeFilte
 
     if (timeFilter === 'weekly') {
         const weeksData: { name: string, income: number, expenses: number }[] = [];
-        // Last 12 weeks
-        for (let i = 11; i >= 0; i--) {
+        // Last 6 weeks
+        for (let i = 5; i >= 0; i--) {
             const weekStart = addDays(now, -i * 7);
             const weekEnd = addDays(weekStart, 6);
             const weekLabel = format(weekStart, 'MMM dd');
@@ -253,9 +253,9 @@ export const generateIncomeExpenseData = (transactions: Transaction[], timeFilte
         });
         return yearsData;
     } else {
-        // Monthly (last 12 months)
+        // Monthly (last 6 months)
         const monthsData: { month: string, year: number, income: number, expenses: number }[] = [];
-        for (let i = 11; i >= 0; i--) {
+        for (let i = 5; i >= 0; i--) {
             const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
             const monthName = format(date, 'MMM');
             monthsData.push({

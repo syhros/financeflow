@@ -1,13 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Card from './Card';
 import { PlusIcon, PencilIcon, CloseIcon, CalendarIcon, RefreshIcon } from './icons';
-import { RecurringPayment, Asset } from '../types';
+import { RecurringPayment, Asset, Debt } from '../types';
 import { format } from 'date-fns';
 import { useCurrency } from '../App';
 
 interface RecurringProps {
     payments: RecurringPayment[];
     assets: Asset[];
+    debts: Debt[];
     onAddPayment: (payment: Omit<RecurringPayment, 'id'>) => void;
     onUpdatePayment: (payment: RecurringPayment) => void;
 }
@@ -27,7 +28,7 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; chi
     );
 };
 
-const AddEditRecurringModal: React.FC<{ isOpen: boolean; onClose: () => void; payment?: RecurringPayment; assets: Asset[]; onSave: (payment: any) => void; }> = ({ isOpen, onClose, payment, assets, onSave }) => {
+const AddEditRecurringModal: React.FC<{ isOpen: boolean; onClose: () => void; payment?: RecurringPayment; assets: Asset[]; debts: Debt[]; onSave: (payment: any) => void; }> = ({ isOpen, onClose, payment, assets, debts, onSave }) => {
     const [formData, setFormData] = useState<any>({});
     const { currency } = useCurrency();
     const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
@@ -64,7 +65,15 @@ const AddEditRecurringModal: React.FC<{ isOpen: boolean; onClose: () => void; pa
                 <div><label htmlFor="name" className={labelStyles}>Payment Name</label><input type="text" id="name" value={formData.name || ''} onChange={handleChange} placeholder="e.g., Salary, Rent, Utilities" className={commonInputStyles} /></div>
                 <div>
                     <label htmlFor="fromAccountId" className={labelStyles}>{formData.type === 'Transfer' ? 'From Account' : 'Account'}</label>
-                    <select id="fromAccountId" value={formData.fromAccountId || ''} onChange={handleChange} className={commonInputStyles}><option value="">Select an account</option>{assets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
+                    <select id="fromAccountId" value={formData.fromAccountId || ''} onChange={handleChange} className={commonInputStyles}>
+                        <option value="">Select an account</option>
+                        <optgroup label="Regular Accounts">
+                            {assets.filter(a => a.status === 'Active').map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                        </optgroup>
+                        <optgroup label="Debt Accounts">
+                            {debts.filter(d => d.status === 'Active').map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                        </optgroup>
+                    </select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -79,7 +88,15 @@ const AddEditRecurringModal: React.FC<{ isOpen: boolean; onClose: () => void; pa
                 {formData.type === 'Transfer' && (
                     <div>
                         <label htmlFor="toAccountId" className={labelStyles}>To Account</label>
-                        <select id="toAccountId" value={formData.toAccountId || ''} onChange={handleChange} className={commonInputStyles}><option value="">Select an account</option>{assets.filter(a => a.id !== formData.fromAccountId).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
+                        <select id="toAccountId" value={formData.toAccountId || ''} onChange={handleChange} className={commonInputStyles}>
+                            <option value="">Select an account</option>
+                            <optgroup label="Regular Accounts">
+                                {assets.filter(a => a.status === 'Active' && a.id !== formData.fromAccountId).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                            </optgroup>
+                            <optgroup label="Debt Accounts">
+                                {debts.filter(d => d.status === 'Active' && d.id !== formData.fromAccountId).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            </optgroup>
+                        </select>
                     </div>
                 )}
                 <div>
@@ -99,10 +116,10 @@ const AddEditRecurringModal: React.FC<{ isOpen: boolean; onClose: () => void; pa
     );
 };
 
-const PaymentListItem: React.FC<{ payment: RecurringPayment; assets: Asset[]; onEdit: (payment: RecurringPayment) => void; }> = ({ payment, assets, onEdit }) => {
+const PaymentListItem: React.FC<{ payment: RecurringPayment; assets: Asset[]; debts: Debt[]; onEdit: (payment: RecurringPayment) => void; }> = ({ payment, assets, debts, onEdit }) => {
     const { formatCurrency } = useCurrency();
-    const fromAccount = assets.find(a => a.id === payment.fromAccountId);
-    const toAccount = payment.toAccountId ? assets.find(a => a.id === payment.toAccountId) : null;
+    const fromAccount = assets.find(a => a.id === payment.fromAccountId) || debts.find(d => d.id === payment.fromAccountId);
+    const toAccount = payment.toAccountId ? (assets.find(a => a.id === payment.toAccountId) || debts.find(d => d.id === payment.toAccountId)) : null;
     const typeColor = payment.type === 'Income' ? 'text-primary' : payment.type === 'Expense' ? 'text-red-400' : 'text-blue-400';
 
     return (
@@ -130,7 +147,7 @@ const PaymentListItem: React.FC<{ payment: RecurringPayment; assets: Asset[]; on
     )
 }
 
-const Recurring: React.FC<RecurringProps> = ({ payments, assets, onAddPayment, onUpdatePayment }) => {
+const Recurring: React.FC<RecurringProps> = ({ payments, assets, debts, onAddPayment, onUpdatePayment }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedPayment, setSelectedPayment] = useState<RecurringPayment | undefined>(undefined);
 
@@ -154,7 +171,7 @@ const Recurring: React.FC<RecurringProps> = ({ payments, assets, onAddPayment, o
 
     return (
         <>
-        <AddEditRecurringModal isOpen={isModalOpen} onClose={handleCloseModal} payment={selectedPayment} assets={assets} onSave={handleSave} />
+        <AddEditRecurringModal isOpen={isModalOpen} onClose={handleCloseModal} payment={selectedPayment} assets={assets} debts={debts} onSave={handleSave} />
         <div className="max-w-7xl mx-auto space-y-8">
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold text-white">Recurring Payments</h1>
@@ -166,7 +183,7 @@ const Recurring: React.FC<RecurringProps> = ({ payments, assets, onAddPayment, o
             <Card>
                 <div className="divide-y divide-border-color">
                     {payments.length > 0 ? (
-                        payments.map(p => <PaymentListItem key={p.id} payment={p} assets={assets} onEdit={handleOpenModal} />)
+                        payments.map(p => <PaymentListItem key={p.id} payment={p} assets={assets} debts={debts} onEdit={handleOpenModal} />)
                     ) : (
                         <p className="text-gray-400 py-8 text-center">No recurring payments set up yet.</p>
                     )}

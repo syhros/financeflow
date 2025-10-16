@@ -469,8 +469,8 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
         const activeDebts = debts.filter(d => d.status === 'Active');
 
         if (!user.accountSelection || user.accountSelection.mode === 'automatic') {
-            const assetCount = user.accountSelection?.automaticCounts.assets || 3;
-            const debtCount = user.accountSelection?.automaticCounts.debts || 3;
+            const assetCount = user.accountSelection?.automaticCounts.assets || 7;
+            const debtCount = user.accountSelection?.automaticCounts.debts || 7;
 
             const topAssets = [...activeAssets].sort((a,b) => b.balance - a.balance).slice(0, assetCount);
             const topDebts = [...activeDebts].sort((a,b) => b.balance - a.balance).slice(0, debtCount);
@@ -553,7 +553,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                 <Card className="lg:col-span-1">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-bold">Accounts</h2>
-                        <button onClick={() => navigateTo(Page.Accounts)} className="text-primary hover:text-green-300"><PlusIcon className="w-5 h-5"/></button>
+                        <button onClick={() => navigateTo(Page.Accounts)} className="text-sm text-primary hover:underline font-semibold">View More</button>
                     </div>
                     <div className="space-y-4">
                         {topAssets.map(acc => {
@@ -571,12 +571,11 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                                 </div>
                             );
                         })}
-                         {assets.filter(a => a.status === 'Active').length > 3 && <button onClick={() => navigateTo(Page.Accounts)} className="text-sm text-primary hover:underline w-full text-center pt-2">View More</button>}
                     </div>
                     <div className="mt-6 pt-6 border-t border-border-color">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-bold">Debts</h2>
-                            <button onClick={() => navigateTo(Page.Debts)} className="text-primary hover:text-green-300"><PlusIcon className="w-5 h-5"/></button>
+                            <button onClick={() => navigateTo(Page.Debts)} className="text-sm text-primary hover:underline font-semibold">View More</button>
                         </div>
                         <div className="space-y-4">
                              {topDebts.map(acc => {
@@ -594,7 +593,6 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                                     </div>
                                 );
                             })}
-                            {debts.filter(d => d.status === 'Active').length > 3 && <button onClick={() => navigateTo(Page.Debts)} className="text-sm text-primary hover:underline w-full text-center pt-2">View More</button>}
                         </div>
                     </div>
                 </Card>

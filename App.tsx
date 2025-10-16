@@ -472,7 +472,7 @@ const App: React.FC = () => {
             case Page.Bills:
                  return <Bills bills={bills} assets={assets} onAddBill={handleAddBill} onUpdateBill={handleUpdateBill} highlightedItemId={highlightedItemId} setHighlightedItemId={setHighlightedItemId} />;
             case Page.Recurring:
-                return <Recurring payments={recurringPayments} assets={assets} onAddPayment={handleAddRecurringPayment} onUpdatePayment={handleUpdateRecurringPayment} />;
+                return <Recurring payments={recurringPayments} assets={assets} debts={debts} onAddPayment={handleAddRecurringPayment} onUpdatePayment={handleUpdateRecurringPayment} />;
             case Page.Categorize:
                  return <Categorize transactions={uncategorizedTransactions} onUpdateTransaction={handleUpdateTransaction} onAddRule={handleAddRule} assets={assets} debts={debts} categories={categories} />;
             case Page.Settings:

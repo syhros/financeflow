@@ -20,29 +20,30 @@ interface CategoryData {
 }
 
 const Trends: React.FC<TrendsProps> = ({ assets, debts, transactions }) => {
-    const [timeFilter, setTimeFilter] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
+    const [netWorthFilter, setNetWorthFilter] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
+    const [incomeExpenseFilter, setIncomeExpenseFilter] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
     const totalAssets = useMemo(() => assets.filter(a => a.status === 'Active').reduce((sum, acc) => sum + acc.balance, 0), [assets]);
     const totalDebts = useMemo(() => debts.filter(d => d.status === 'Active').reduce((sum, acc) => sum + acc.balance, 0), [debts]);
     const netWorth = useMemo(() => totalAssets - totalDebts, [totalAssets, totalDebts]);
     const { formatCurrency } = useCurrency();
 
     // Generate dynamic chart data from transactions with filtering
-    const incomeExpenseData = useMemo(() => generateIncomeExpenseData(transactions, timeFilter), [transactions, timeFilter]);
-    const netWorthData = useMemo(() => generateNetWorthData(transactions, timeFilter), [transactions, timeFilter]);
+    const incomeExpenseData = useMemo(() => generateIncomeExpenseData(transactions, incomeExpenseFilter), [transactions, incomeExpenseFilter]);
+    const netWorthData = useMemo(() => generateNetWorthData(transactions, netWorthFilter), [transactions, netWorthFilter]);
 
-    // Generate category analysis based on time filter
+    // Generate category analysis based on income/expense filter
     const categoryAnalysis = useMemo((): CategoryData[] => {
         const now = new Date();
         const categories: {[key: string]: {current: number, previous: number}} = {};
 
         let currentStart: Date, currentEnd: Date, previousStart: Date, previousEnd: Date;
 
-        if (timeFilter === 'weekly') {
+        if (incomeExpenseFilter === 'weekly') {
             currentEnd = now;
             currentStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
             previousEnd = new Date(currentStart.getTime() - 1);
             previousStart = new Date(previousEnd.getTime() - 7 * 24 * 60 * 60 * 1000);
-        } else if (timeFilter === 'monthly') {
+        } else if (incomeExpenseFilter === 'monthly') {
             currentStart = new Date(now.getFullYear(), now.getMonth(), 1);
             currentEnd = now;
             previousStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -83,9 +84,9 @@ const Trends: React.FC<TrendsProps> = ({ assets, debts, transactions }) => {
             }))
             .sort((a, b) => b.current - a.current)
             .slice(0, 6);
-    }, [transactions, timeFilter]);
+    }, [transactions, incomeExpenseFilter]);
 
-    const periodLabel = timeFilter === 'weekly' ? 'week' : timeFilter === 'monthly' ? 'month' : 'year';
+    const periodLabel = incomeExpenseFilter === 'weekly' ? 'week' : incomeExpenseFilter === 'monthly' ? 'month' : 'year';
 
     return (
         <div className="max-w-7xl mx-auto space-y-8">
@@ -95,9 +96,9 @@ const Trends: React.FC<TrendsProps> = ({ assets, debts, transactions }) => {
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold text-white">Net Worth Over Time</h2>
                     <div className="flex space-x-2 bg-gray-900 p-1 rounded-lg">
-                        <button onClick={() => setTimeFilter('weekly')} className={`px-4 py-2 text-sm rounded-md transition-colors ${timeFilter === 'weekly' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Weekly</button>
-                        <button onClick={() => setTimeFilter('monthly')} className={`px-4 py-2 text-sm rounded-md transition-colors ${timeFilter === 'monthly' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Monthly</button>
-                        <button onClick={() => setTimeFilter('yearly')} className={`px-4 py-2 text-sm rounded-md transition-colors ${timeFilter === 'yearly' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Yearly</button>
+                        <button onClick={() => setNetWorthFilter('weekly')} className={`px-4 py-2 text-sm rounded-md transition-colors ${netWorthFilter === 'weekly' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Weekly</button>
+                        <button onClick={() => setNetWorthFilter('monthly')} className={`px-4 py-2 text-sm rounded-md transition-colors ${netWorthFilter === 'monthly' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Monthly</button>
+                        <button onClick={() => setNetWorthFilter('yearly')} className={`px-4 py-2 text-sm rounded-md transition-colors ${netWorthFilter === 'yearly' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Yearly</button>
                     </div>
                 </div>
                 <div className="h-80">
@@ -111,9 +112,9 @@ const Trends: React.FC<TrendsProps> = ({ assets, debts, transactions }) => {
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-bold text-white">Income vs Expenses</h2>
                             <div className="flex space-x-2 bg-gray-900 p-1 rounded-lg">
-                                <button onClick={() => setTimeFilter('weekly')} className={`px-4 py-2 text-sm rounded-md transition-colors ${timeFilter === 'weekly' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Weekly</button>
-                                <button onClick={() => setTimeFilter('monthly')} className={`px-4 py-2 text-sm rounded-md transition-colors ${timeFilter === 'monthly' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Monthly</button>
-                                <button onClick={() => setTimeFilter('yearly')} className={`px-4 py-2 text-sm rounded-md transition-colors ${timeFilter === 'yearly' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Yearly</button>
+                                <button onClick={() => setIncomeExpenseFilter('weekly')} className={`px-4 py-2 text-sm rounded-md transition-colors ${incomeExpenseFilter === 'weekly' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Weekly</button>
+                                <button onClick={() => setIncomeExpenseFilter('monthly')} className={`px-4 py-2 text-sm rounded-md transition-colors ${incomeExpenseFilter === 'monthly' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Monthly</button>
+                                <button onClick={() => setIncomeExpenseFilter('yearly')} className={`px-4 py-2 text-sm rounded-md transition-colors ${incomeExpenseFilter === 'yearly' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Yearly</button>
                             </div>
                         </div>
                         <div className="h-80">

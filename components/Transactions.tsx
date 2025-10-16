@@ -372,12 +372,6 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts
                 <div className="lg:col-span-2">
                     <Card>
                         <div className="space-y-4 mb-4">
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <h2 className="text-xl font-bold">Transactions</h2>
-                                    <p className="text-sm text-gray-400 mt-1">Filter and sort your transaction history</p>
-                                </div>
-                            </div>
                             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
                                 <div className="flex flex-wrap gap-3">
                                     <div className="flex space-x-1 bg-gray-900 p-1 rounded-lg">
