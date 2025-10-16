@@ -217,31 +217,38 @@ export const allTransactions = [...historicalTransactions, ...mockTransactions];
 // Generate dynamic chart data from transactions
 export const generateIncomeExpenseData = (transactions: Transaction[]) => {
     const now = new Date();
-    const monthsData: { [key: string]: { income: number, expenses: number } } = {};
+    const monthsData: { month: string, year: number, income: number, expenses: number }[] = [];
 
-    // Get last 6 months
+    // Get last 6 months with year tracking
     for (let i = 5; i >= 0; i--) {
         const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
         const monthName = format(date, 'MMM');
-        monthsData[monthName] = { income: 0, expenses: 0 };
+        monthsData.push({
+            month: monthName,
+            year: date.getFullYear(),
+            income: 0,
+            expenses: 0
+        });
     }
 
-    // Aggregate transaction data by month
+    // Aggregate transaction data by month AND year
     transactions.forEach(tx => {
         const txDate = new Date(tx.date);
         const monthName = format(txDate, 'MMM');
+        const txYear = txDate.getFullYear();
 
-        if (monthsData[monthName] !== undefined) {
+        const monthEntry = monthsData.find(m => m.month === monthName && m.year === txYear);
+        if (monthEntry) {
             if (tx.type === 'income') {
-                monthsData[monthName].income += tx.amount;
+                monthEntry.income += tx.amount;
             } else if (tx.type === 'expense') {
-                monthsData[monthName].expenses += tx.amount;
+                monthEntry.expenses += tx.amount;
             }
         }
     });
 
-    return Object.entries(monthsData).map(([name, data]) => ({
-        name,
+    return monthsData.map(data => ({
+        name: data.month,
         income: Math.round(data.income),
         expenses: Math.round(data.expenses)
     }));

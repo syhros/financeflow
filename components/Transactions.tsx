@@ -216,6 +216,7 @@ const TransactionItem: React.FC<{ tx: Transaction, onEdit: (tx: Transaction) => 
 
 const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, budgets, categories, onAddTransaction, onUpdateTransaction, onUpdateBudgets }) => {
     const [filter, setFilter] = useState<'all' | 'expense' | 'income' | 'investing'>('all');
+    const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
     const [chartView, setChartView] = useState<'expense' | 'income'>('expense');
     const [isTxModalOpen, setIsTxModalOpen] = useState(false);
     const [editingTx, setEditingTx] = useState<Transaction | undefined>(undefined);
@@ -254,7 +255,11 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, budge
     }
 
     const { totalExpenses, totalIncome } = useMemo(() => {
-        const thisMonthTxs = transactions.filter(tx => new Date(tx.date).getMonth() === new Date().getMonth());
+        const now = new Date();
+        const thisMonthTxs = transactions.filter(tx => {
+            const txDate = new Date(tx.date);
+            return txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
+        });
         return {
             totalExpenses: thisMonthTxs.filter(t => t.type === 'expense').reduce((sum, tx) => sum + tx.amount, 0),
             totalIncome: thisMonthTxs.filter(t => t.type === 'income').reduce((sum, tx) => sum + tx.amount, 0),
@@ -267,11 +272,27 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, budge
         return tx.type === filter;
     });
 
+    // Sort transactions
+    const sortedTransactions = [...filteredTransactions].sort((a, b) => {
+        switch(sortBy) {
+            case 'date-desc':
+                return new Date(b.date).getTime() - new Date(a.date).getTime();
+            case 'date-asc':
+                return new Date(a.date).getTime() - new Date(b.date).getTime();
+            case 'amount-desc':
+                return b.amount - a.amount;
+            case 'amount-asc':
+                return a.amount - b.amount;
+            default:
+                return 0;
+        }
+    });
+
     // Pagination
-    const totalPages = Math.ceil(filteredTransactions.length / perPage);
+    const totalPages = Math.ceil(sortedTransactions.length / perPage);
     const startIndex = (currentPage - 1) * perPage;
     const endIndex = startIndex + perPage;
-    const paginatedTransactions = filteredTransactions.slice(startIndex, endIndex);
+    const paginatedTransactions = sortedTransactions.slice(startIndex, endIndex);
 
     // Reset to page 1 when filter changes
     useEffect(() => {
@@ -294,13 +315,30 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, budge
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2">
                     <Card>
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-bold">History</h2>
-                             <div className="flex space-x-1 bg-gray-900 p-1 rounded-lg">
-                                <button onClick={() => setFilter('all')} className={`px-4 py-2 text-sm rounded-md ${filter === 'all' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>All</button>
-                                <button onClick={() => setFilter('expense')} className={`px-4 py-2 text-sm rounded-md ${filter === 'expense' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Expenses</button>
-                                <button onClick={() => setFilter('income')} className={`px-4 py-2 text-sm rounded-md ${filter === 'income' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Income</button>
-                                <button onClick={() => setFilter('investing')} className={`px-4 py-2 text-sm rounded-md ${filter === 'investing' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Investing</button>
+                        <div className="space-y-4 mb-4">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <h2 className="text-xl font-bold">Transactions</h2>
+                                    <p className="text-sm text-gray-400 mt-1">Filter and sort your transaction history</p>
+                                </div>
+                            </div>
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <div className="flex space-x-1 bg-gray-900 p-1 rounded-lg">
+                                    <button onClick={() => setFilter('all')} className={`px-4 py-2 text-sm rounded-md ${filter === 'all' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>All</button>
+                                    <button onClick={() => setFilter('expense')} className={`px-4 py-2 text-sm rounded-md ${filter === 'expense' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Expenses</button>
+                                    <button onClick={() => setFilter('income')} className={`px-4 py-2 text-sm rounded-md ${filter === 'income' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Income</button>
+                                    <button onClick={() => setFilter('investing')} className={`px-4 py-2 text-sm rounded-md ${filter === 'investing' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Investing</button>
+                                </div>
+                                <select
+                                    value={sortBy}
+                                    onChange={(e) => setSortBy(e.target.value as any)}
+                                    className="bg-gray-900 text-white px-4 py-2 text-sm rounded-lg border border-gray-700 focus:border-primary outline-none"
+                                >
+                                    <option value="date-desc">Date (Newest First)</option>
+                                    <option value="date-asc">Date (Oldest First)</option>
+                                    <option value="amount-desc">Amount (High to Low)</option>
+                                    <option value="amount-asc">Amount (Low to High)</option>
+                                </select>
                             </div>
                         </div>
                          <div className="divide-y divide-border-color">

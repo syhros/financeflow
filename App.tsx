@@ -167,25 +167,15 @@ const App: React.FC = () => {
     // Asset Handlers
     const handleAddAsset = (asset: Omit<Asset, 'id'>) => setAssets(prev => [...prev, { ...asset, id: new Date().toISOString() }]);
     const handleUpdateAsset = (updatedAsset: Asset, oldBalance?: number) => {
-        // Don't automatically update balance if oldBalance is provided - transaction will handle it
-        if (oldBalance !== undefined && oldBalance !== updatedAsset.balance) {
-            // Keep the old balance, let the transaction system update it
-            setAssets(prev => prev.map(a => a.id === updatedAsset.id ? { ...updatedAsset, balance: oldBalance } : a));
-        } else {
-            setAssets(prev => prev.map(a => a.id === updatedAsset.id ? updatedAsset : a));
-        }
+        // Update the asset with all new properties
+        setAssets(prev => prev.map(a => a.id === updatedAsset.id ? updatedAsset : a));
     };
 
     // Debt Handlers
     const handleAddDebt = (debt: Omit<Debt, 'id'>) => setDebts(prev => [...prev, { ...debt, id: new Date().toISOString() }]);
     const handleUpdateDebt = (updatedDebt: Debt, oldBalance?: number) => {
-        // Don't automatically update balance if oldBalance is provided - transaction will handle it
-        if (oldBalance !== undefined && oldBalance !== updatedDebt.balance) {
-            // Keep the old balance, let the transaction system update it
-            setDebts(prev => prev.map(d => d.id === updatedDebt.id ? { ...updatedDebt, balance: oldBalance } : d));
-        } else {
-            setDebts(prev => prev.map(d => d.id === updatedDebt.id ? updatedDebt : d));
-        }
+        // Update the debt with all new properties
+        setDebts(prev => prev.map(d => d.id === updatedDebt.id ? updatedDebt : d));
     };
 
     // Goal Handlers

@@ -158,6 +158,8 @@ const AddEditAccountModal: React.FC<{ isOpen: boolean; onClose: () => void; asse
 const AssetAccountCard: React.FC<{ asset: Asset; onEdit: (acc: Asset) => void }> = ({ asset, onEdit }) => {
     const { formatCurrency } = useCurrency();
     const Icon = iconMap[asset.icon];
+    const monthlyEarnings = asset.interestRate && asset.balance ? (asset.interestRate * asset.balance) / 100 / 12 : 0;
+
     return (
         <Card className={`flex items-center justify-between ${asset.status === 'Closed' ? 'opacity-60' : ''}`}>
             <div className="flex items-center">
@@ -171,6 +173,9 @@ const AssetAccountCard: React.FC<{ asset: Asset; onEdit: (acc: Asset) => void }>
             <div className="text-right flex items-center gap-4">
                 <div>
                     <p className="font-bold text-white text-lg">{formatCurrency(asset.balance)}</p>
+                    {monthlyEarnings > 0 && asset.status === 'Active' && (
+                        <p className="text-sm font-bold text-green-400">Earning {formatCurrency(monthlyEarnings)}/m</p>
+                    )}
                     <p className="text-xs text-gray-400">Updated {asset.lastUpdated}</p>
                 </div>
                 {asset.status === 'Active' && <button onClick={() => onEdit(asset)} className="text-gray-500 hover:text-white"><PencilIcon className="w-4 h-4" /></button>}

@@ -231,15 +231,21 @@ const DebtAccountCard: React.FC<{ debt: Debt; onEdit: (acc: Debt) => void }> = (
                 <div className="w-full bg-gray-700 rounded-full h-2"><div className="bg-primary h-2 rounded-full" style={{ width: `${progress}%` }}></div></div>
             </div>
             
-            <div className="flex justify-between items-start mt-4 pt-4 border-t border-border-color">
+            <div className={`flex ${debt.promotionalOffer ? 'justify-between' : 'justify-between'} items-start mt-4 pt-4 border-t border-border-color`}>
                 <div className="text-left">
                     <p className="text-xs text-gray-400">Payment</p>
                     <p className="font-semibold text-white">{formatCurrency(debt.promotionalOffer?.offerPayment || debt.minPayment)}</p>
                 </div>
-                <div className="text-center">
+                <div className={debt.promotionalOffer ? 'text-center' : 'text-left'}>
                     <p className="text-xs text-gray-400">Interest Rate</p>
                     <p className="font-semibold text-white">{(debt.promotionalOffer?.apr ?? debt.interestRate).toFixed(1)}%</p>
                 </div>
+                {!debt.promotionalOffer && debt.interestRate > 0 && debt.balance > 0 && (
+                    <div className="text-left">
+                        <p className="text-xs text-gray-400">Est. Interest</p>
+                        <p className="font-semibold text-red-400">{formatCurrency((debt.interestRate * debt.balance) / 100 / 12)}/m</p>
+                    </div>
+                )}
                  <div className="text-right">
                     <p className="text-xs text-gray-400">{label}</p>
                     <p className="font-semibold text-white">{value}</p>
