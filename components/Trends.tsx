@@ -1,29 +1,34 @@
 import React, { useMemo } from 'react';
 import Card from './Card';
 import { IncomeExpenseChart, NetWorthChart } from './charts';
-import { mockNetWorthData } from '../data/mockData';
-import { Asset, Debt } from '../types';
+import { dynamicNetWorthData, dynamicIncomeExpenseData, generateIncomeExpenseData, generateNetWorthData } from '../data/mockData';
+import { Asset, Debt, Transaction } from '../types';
 import { useCurrency } from '../App';
 
 interface TrendsProps {
     assets: Asset[];
     debts: Debt[];
+    transactions: Transaction[];
 }
 
-const Trends: React.FC<TrendsProps> = ({ assets, debts }) => {
+const Trends: React.FC<TrendsProps> = ({ assets, debts, transactions }) => {
     const totalAssets = useMemo(() => assets.filter(a => a.status === 'Active').reduce((sum, acc) => sum + acc.balance, 0), [assets]);
     const totalDebts = useMemo(() => debts.filter(d => d.status === 'Active').reduce((sum, acc) => sum + acc.balance, 0), [debts]);
     const netWorth = useMemo(() => totalAssets - totalDebts, [totalAssets, totalDebts]);
     const { formatCurrency } = useCurrency();
 
+    // Generate dynamic chart data from transactions
+    const incomeExpenseData = useMemo(() => generateIncomeExpenseData(transactions), [transactions]);
+    const netWorthData = useMemo(() => generateNetWorthData(transactions), [transactions]);
+
     return (
         <div className="max-w-7xl mx-auto space-y-8">
             <h1 className="text-3xl font-bold text-white">Trends</h1>
-            
+
              <Card>
                 <h2 className="text-xl font-bold text-white mb-4">Net Worth Over Time</h2>
                 <div className="h-80">
-                   <NetWorthChart data={mockNetWorthData} />
+                   <NetWorthChart data={netWorthData} />
                 </div>
             </Card>
 
@@ -32,7 +37,7 @@ const Trends: React.FC<TrendsProps> = ({ assets, debts }) => {
                     <Card>
                         <h2 className="text-xl font-bold text-white mb-4">Income vs Expenses</h2>
                         <div className="h-80">
-                            <IncomeExpenseChart />
+                            <IncomeExpenseChart data={incomeExpenseData} />
                         </div>
                     </Card>
                 </div>

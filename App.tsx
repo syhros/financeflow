@@ -361,7 +361,7 @@ const App: React.FC = () => {
             case Page.Debts:
                 return <Debts debts={debts} onAddDebt={handleAddDebt} onUpdateDebt={handleUpdateDebt} />;
             case Page.Trends:
-                return <Trends assets={assets} debts={debts} />;
+                return <Trends assets={assets} debts={debts} transactions={transactions} />;
             case Page.Goals:
                  return <Goals goals={goals} assets={assets} onAddGoal={handleAddGoal} onUpdateGoal={handleUpdateGoal} highlightedItemId={highlightedItemId} setHighlightedItemId={setHighlightedItemId} />;
             case Page.Bills:

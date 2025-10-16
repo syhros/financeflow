@@ -213,3 +213,72 @@ export const historicalTransactions = generateHistoricalTransactions();
 
 // Combine with existing mock transactions
 export const allTransactions = [...historicalTransactions, ...mockTransactions];
+
+// Generate dynamic chart data from transactions
+export const generateIncomeExpenseData = (transactions: Transaction[]) => {
+    const now = new Date();
+    const monthsData: { [key: string]: { income: number, expenses: number } } = {};
+
+    // Get last 6 months
+    for (let i = 5; i >= 0; i--) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthName = format(date, 'MMM');
+        monthsData[monthName] = { income: 0, expenses: 0 };
+    }
+
+    // Aggregate transaction data by month
+    transactions.forEach(tx => {
+        const txDate = new Date(tx.date);
+        const monthName = format(txDate, 'MMM');
+
+        if (monthsData[monthName] !== undefined) {
+            if (tx.type === 'income') {
+                monthsData[monthName].income += tx.amount;
+            } else if (tx.type === 'expense') {
+                monthsData[monthName].expenses += tx.amount;
+            }
+        }
+    });
+
+    return Object.entries(monthsData).map(([name, data]) => ({
+        name,
+        income: Math.round(data.income),
+        expenses: Math.round(data.expenses)
+    }));
+};
+
+export const generateNetWorthData = (transactions: Transaction[]) => {
+    const now = new Date();
+    const monthsData: { name: string, value: number }[] = [];
+
+    // Get last 6 months
+    for (let i = 5; i >= 0; i--) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthName = format(date, 'MMM');
+
+        // Calculate cumulative net worth up to this month
+        let totalIncome = 0;
+        let totalExpenses = 0;
+
+        transactions.forEach(tx => {
+            const txDate = new Date(tx.date);
+            if (txDate <= date) {
+                if (tx.type === 'income') totalIncome += tx.amount;
+                else if (tx.type === 'expense') totalExpenses += tx.amount;
+            }
+        });
+
+        // Start with base net worth and add cumulative transactions
+        const baseNetWorth = 40000; // Starting point
+        monthsData.push({
+            name: monthName,
+            value: Math.round(baseNetWorth + totalIncome - totalExpenses)
+        });
+    }
+
+    return monthsData;
+};
+
+// Export dynamic data
+export const dynamicIncomeExpenseData = generateIncomeExpenseData(allTransactions);
+export const dynamicNetWorthData = generateNetWorthData(allTransactions);

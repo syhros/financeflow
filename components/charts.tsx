@@ -130,16 +130,11 @@ export const BudgetDoughnut: React.FC<BudgetDoughnutProps> = ({ value, total, la
     );
 };
 
-const incomeExpenseData = [
-  { name: 'Jul', income: 4000, expenses: 2400 },
-  { name: 'Aug', income: 3000, expenses: 1398 },
-  { name: 'Sep', income: 2000, expenses: 9800 },
-  { name: 'Oct', income: 2780, expenses: 3908 },
-  { name: 'Nov', income: 1890, expenses: 4800 },
-  { name: 'Dec', income: 2390, expenses: 3800 },
-];
+interface IncomeExpenseChartProps {
+    data?: { name: string; income: number; expenses: number }[];
+}
 
-export const IncomeExpenseChart: React.FC = () => {
+export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({ data }) => {
     const { currency } = useCurrency();
     const tickFormatter = (value: number) => {
         const symbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
@@ -150,9 +145,12 @@ export const IncomeExpenseChart: React.FC = () => {
         return `${symbol}${value.toLocaleString()}`;
     };
 
+    // Use provided data or fallback to empty array
+    const chartData = data || [];
+
     return (
         <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={incomeExpenseData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <defs>
                     <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#26c45d" stopOpacity={0.4} />
