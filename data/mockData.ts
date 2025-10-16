@@ -27,7 +27,7 @@ export const mockAssets: Asset[] = [
   { id: '1', accountType: 'asset', name: 'Main Current', type: 'Checking', balance: 15340.75, status: 'Active', lastUpdated: '2h ago', icon: 'AccountsIcon', color: 'bg-green-500', interestRate: 0.1 },
   { id: '2', accountType: 'asset', name: 'Holiday Fund', type: 'Savings', balance: 2499.50, status: 'Active', lastUpdated: '1d ago', icon: 'WalletIcon', color: 'bg-blue-500', interestRate: 2.5 },
   { id: '3', accountType: 'asset', name: 'Emergency Savings', type: 'Savings', balance: 10500.00, status: 'Active', lastUpdated: '3d ago', icon: 'WalletIcon', color: 'bg-teal-500', interestRate: 3.0 },
-  { id: '4', accountType: 'asset', name: 'Stocks & Shares ISA', type: 'Investing', balance: 0, status: 'Active', lastUpdated: '1h ago', icon: 'WalletIcon', color: 'bg-purple-500', holdings: mockHoldings },
+  { id: '4', accountType: 'asset', name: 'Stocks & Shares ISA', type: 'Investing', balance: 0, status: 'Active', lastUpdated: '1h ago', icon: 'WalletIcon', color: 'bg-purple-500', holdings: [] },
   { id: '5', accountType: 'asset', name: 'Chase Debit', type: 'Checking', balance: 1234.56, status: 'Active', lastUpdated: 'just now', icon: 'AccountsIcon', color: 'bg-sky-500' },
   { id: '6', accountType: 'asset', name: 'Crypto Wallet', type: 'Investing', balance: 0, status: 'Active', lastUpdated: '5m ago', icon: 'WalletIcon', color: 'bg-yellow-500', holdings: [] },
   { id: '7', accountType: 'asset', name: 'Old Student Account', type: 'Checking', balance: 0.00, status: 'Closed', lastUpdated: 'Archived', icon: 'AccountsIcon', color: 'bg-gray-600' },

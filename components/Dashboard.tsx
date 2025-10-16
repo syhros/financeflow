@@ -147,7 +147,7 @@ const AccountSelectionModal: React.FC<{
                                 <div className="space-y-2">
                                     {activeAssets.map(asset => (
                                         <label key={asset.id} className="flex items-center gap-3 p-3 bg-gray-700 rounded-lg hover:bg-gray-600 cursor-pointer transition-colors">
-                                            <input type="checkbox" checked={selectedAssetIds.includes(asset.id!)} onChange={() => toggleAsset(asset.id!)} disabled={!selectedAssetIds.includes(asset.id!) && totalSelected >= 6} className="w-5 h-5 rounded border-gray-500 text-primary focus:ring-primary" />
+                                            <input type="checkbox" checked={selectedAssetIds.includes(asset.id!)} onChange={() => toggleAsset(asset.id!)} disabled={!selectedAssetIds.includes(asset.id!) && totalSelected >= 7} className="w-5 h-5 rounded border-gray-500 text-primary focus:ring-primary" />
                                             <span className="text-white font-medium">{asset.name}</span>
                                             <span className="text-gray-400 text-sm ml-auto">{asset.type}</span>
                                         </label>
@@ -160,7 +160,7 @@ const AccountSelectionModal: React.FC<{
                                 <div className="space-y-2">
                                     {activeDebts.map(debt => (
                                         <label key={debt.id} className="flex items-center gap-3 p-3 bg-gray-700 rounded-lg hover:bg-gray-600 cursor-pointer transition-colors">
-                                            <input type="checkbox" checked={selectedDebtIds.includes(debt.id!)} onChange={() => toggleDebt(debt.id!)} disabled={!selectedDebtIds.includes(debt.id!) && totalSelected >= 6} className="w-5 h-5 rounded border-gray-500 text-primary focus:ring-primary" />
+                                            <input type="checkbox" checked={selectedDebtIds.includes(debt.id!)} onChange={() => toggleDebt(debt.id!)} disabled={!selectedDebtIds.includes(debt.id!) && totalSelected >= 7} className="w-5 h-5 rounded border-gray-500 text-primary focus:ring-primary" />
                                             <span className="text-white font-medium">{debt.name}</span>
                                             <span className="text-gray-400 text-sm ml-auto">{debt.type}</span>
                                         </label>
@@ -605,7 +605,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                         <button onClick={() => navigateTo(Page.Transactions)} className="text-sm text-primary hover:underline">View All</button>
                     </div>
                     <div className="divide-y divide-border-color">
-                        {transactions.slice(0, 4).map(tx => (
+                        {transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 6).map(tx => (
                             <div key={tx.id} className="flex items-center justify-between py-3">
                                 <div className="flex items-center">
                                      <div className="w-10 h-10 rounded-lg flex items-center justify-center mr-4 bg-gray-700">

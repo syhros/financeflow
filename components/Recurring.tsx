@@ -73,7 +73,7 @@ const AddEditRecurringModal: React.FC<{ isOpen: boolean; onClose: () => void; pa
         } else {
             setFormData({
                 name: '',
-                type: 'Expense',
+                type: 'Income',
                 amount: 0,
                 frequency: 'Monthly',
                 startDate: new Date().toISOString().split('T')[0],
@@ -112,7 +112,7 @@ const AddEditRecurringModal: React.FC<{ isOpen: boolean; onClose: () => void; pa
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label htmlFor="type" className={labelStyles}>Type</label>
-                        <select id="type" value={formData.type || 'Expense'} onChange={handleChange} className={commonInputStyles}><option>Expense</option><option>Income</option><option>Transfer</option></select>
+                        <select id="type" value={formData.type || 'Income'} onChange={handleChange} className={commonInputStyles}><option>Income</option><option>Transfer</option></select>
                     </div>
                     <div>
                         <label htmlFor="amount" className={labelStyles}>Amount</label>
@@ -310,21 +310,8 @@ const Recurring: React.FC<RecurringProps> = ({ payments, assets, debts, onAddPay
                 </button>
             </div>
 
-            {/* Monthly Summary */}
+            {/* Upcoming Payments and Monthly Summary - Swapped positions */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card>
-                    <h2 className="text-lg font-bold text-white mb-2">Monthly Summary</h2>
-                    <div className="space-y-2">
-                        <p className="text-xs text-gray-400">Total Monthly Net</p>
-                        <p className={`text-3xl font-bold ${monthlySummary.total >= 0 ? 'text-primary' : 'text-red-400'}`}>{formatCurrency(monthlySummary.total)}</p>
-                        <div className="pt-2 space-y-2 text-sm">
-                            <div className="flex justify-between"><span className="text-gray-400">Income</span><span className="text-primary">{formatCurrency(monthlySummary.income)}</span></div>
-                            <div className="flex justify-between"><span className="text-gray-400">Transfers</span><span className="text-blue-400">{formatCurrency(monthlySummary.transfers)}</span></div>
-                            <div className="flex justify-between pt-2 border-t border-border-color font-bold"><span className="text-white">Net</span><span className={monthlySummary.total >= 0 ? 'text-primary' : 'text-red-400'}>{formatCurrency(monthlySummary.total)}</span></div>
-                        </div>
-                    </div>
-                </Card>
-
                 {/* Upcoming Payments */}
                 <Card className="md:col-span-2">
                     <h2 className="text-lg font-bold text-white mb-4">Upcoming Payments (Next 7 Days)</h2>
@@ -334,6 +321,20 @@ const Recurring: React.FC<RecurringProps> = ({ payments, assets, debts, onAddPay
                         ) : (
                             <p className="text-gray-400 py-4 text-center text-sm">No payments due in the next 7 days.</p>
                         )}
+                    </div>
+                </Card>
+
+                {/* Monthly Summary */}
+                <Card>
+                    <h2 className="text-lg font-bold text-white mb-2">Monthly Summary</h2>
+                    <div className="space-y-2">
+                        <p className="text-xs text-gray-400">Total Monthly Net</p>
+                        <p className={`text-3xl font-bold ${monthlySummary.total >= 0 ? 'text-primary' : 'text-red-400'}`}>{formatCurrency(monthlySummary.total)}</p>
+                        <div className="pt-2 space-y-2 text-sm">
+                            <div className="flex justify-between"><span className="text-gray-400">Income</span><span className="text-primary">{formatCurrency(monthlySummary.income)}</span></div>
+                            <div className="flex justify-between"><span className="text-gray-400">Transfers</span><span className="text-white">{formatCurrency(monthlySummary.transfers)}</span></div>
+                            <div className="flex justify-between pt-2 border-t border-border-color font-bold"><span className="text-white">Net</span><span className={monthlySummary.total >= 0 ? 'text-primary' : 'text-red-400'}>{formatCurrency(monthlySummary.total)}</span></div>
+                        </div>
                     </div>
                 </Card>
             </div>

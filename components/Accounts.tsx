@@ -146,12 +146,11 @@ const AddEditAccountModal: React.FC<{ isOpen: boolean; onClose: () => void; asse
                         </>
                     )}
                     
-                    <div className={`flex gap-4 ${isInvestingAccount ? 'pt-4' : 'pt-4'}`}>
+                    <div className="flex gap-4 pt-4">
                         <button className="w-full py-3 bg-gray-700 text-white rounded-full font-semibold hover:bg-gray-600 transition-colors" onClick={onClose}>Cancel</button>
                         <button onClick={handleSave} className="w-full py-3 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-500 transition-colors">{asset ? 'Update Account' : 'Add Account'}</button>
                     </div>
                 </div>
-                 {isInvestingAccount && <HoldingsView holdings={formData.holdings || []} marketData={marketData} />}
             </div>
         </Modal>
     );
