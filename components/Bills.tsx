@@ -124,14 +124,14 @@ const AddEditBillModal: React.FC<{ isOpen: boolean; onClose: () => void; bill?: 
 };
 
 
-const BillListItem: React.FC<{ bill: Bill; assets: Asset[]; onEdit: (bill: Bill) => void; className?: string; }> = ({ bill, assets, onEdit, className }) => {
+const BillListItem: React.FC<{ bill: Bill; assets: Asset[]; onEdit: (bill: Bill) => void; className?: string; showEditButton?: boolean; }> = ({ bill, assets, onEdit, className, showEditButton = true }) => {
     const { formatCurrency } = useCurrency();
     const linkedAccount = bill.linkedAccountId ? assets.find(a => a.id === bill.linkedAccountId) : null;
     const paymentTypeColors = { 'Auto-pay': 'text-green-400', 'Manual': 'text-gray-400', 'Reminder': 'text-yellow-400' };
     const paymentTypeDotColors = { 'Auto-pay': 'bg-green-400', 'Manual': 'bg-gray-400', 'Reminder': 'bg-yellow-400' };
 
     return (
-        <div className={`flex items-center justify-between py-4 rounded-lg ${className}`}>
+        <div className={`flex items-center justify-between py-4 rounded-lg px-4 ${className}`}>
             <div className="flex items-center">
                 <div className="w-10 h-10 rounded-lg flex items-center justify-center mr-4 bg-gray-700">
                     <img src={`https://logo.clearbit.com/${bill.name.toLowerCase().replace(/[\s+]/g, '')}.com`} alt={bill.name} className="w-6 h-6 rounded-md object-contain p-0.5" />
@@ -153,7 +153,9 @@ const BillListItem: React.FC<{ bill: Bill; assets: Asset[]; onEdit: (bill: Bill)
                        <p className={`text-xs ${paymentTypeColors[bill.paymentType]}`}>{bill.paymentType}</p>
                     </div>
                 </div>
-                <button onClick={() => onEdit(bill)} className="text-gray-500 hover:text-white"><PencilIcon className="w-4 h-4" /></button>
+                {showEditButton && (
+                    <button onClick={() => onEdit(bill)} className="text-gray-500 hover:text-white"><PencilIcon className="w-4 h-4" /></button>
+                )}
             </div>
         </div>
     );
@@ -263,7 +265,7 @@ const Bills: React.FC<BillsProps> = ({ bills, assets, onAddBill, onUpdateBill, h
                          <h2 className="text-lg font-bold text-white mb-2">Upcoming Payments (Next 7 Days)</h2>
                          <div className="divide-y divide-border-color">
                              {upcomingBills.length > 0 ? (
-                                upcomingBills.map(bill => <BillListItem key={bill.id} bill={bill} assets={assets} onEdit={handleOpenModal} className={bill.id === highlightedItemId ? 'highlight-animate' : ''}/>)
+                                upcomingBills.map(bill => <BillListItem key={bill.id} bill={bill} assets={assets} onEdit={handleOpenModal} showEditButton={false} className={bill.id === highlightedItemId ? 'highlight-animate' : ''}/>)
                              ) : (
                                 <p className="text-gray-400 py-4">No upcoming payments in the next 7 days.</p>
                              )}
@@ -285,31 +287,33 @@ const Bills: React.FC<BillsProps> = ({ bills, assets, onAddBill, onUpdateBill, h
                 </div>
 
                 <Card>
-                    <h2 className="text-lg font-bold text-white mb-4">All Bills</h2>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                        <select value={sort} onChange={e => setSort(e.target.value)} className={commonSelectStyles}>
-                           <option value="date-asc">Sort by Date (Asc)</option>
-                           <option value="date-desc">Sort by Date (Desc)</option>
-                           <option value="amount-asc">Sort by Amount (Asc)</option>
-                           <option value="amount-desc">Sort by Amount (Desc)</option>
-                           <option value="a-z">Sort A-Z</option>
-                        </select>
-                         <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className={commonSelectStyles}>
-                             {uniqueBillTypes.map(type => <option key={type} value={type}>{type === 'All' ? 'All Types' : type}</option>)}
-                        </select>
-                         <select value={paymentFilter} onChange={e => setPaymentFilter(e.target.value)} className={commonSelectStyles}>
-                             {uniquePaymentTypes.map(type => <option key={type} value={type}>{type === 'All' ? 'All Payment Methods' : type}</option>)}
-                        </select>
-                         <select value={accountFilter} onChange={e => setAccountFilter(e.target.value)} className={commonSelectStyles}>
-                           <option value="All">All Accounts</option>
-                           {uniqueAccountIds.map(id => {
-                               const account = assets.find(a => a.id === id);
-                               if(!account) return null;
-                               return <option key={id} value={id}>{account.name}</option>
-                           })}
-                        </select>
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-lg font-bold text-white">All Bills</h2>
+                        <div className="flex gap-2">
+                            <select value={sort} onChange={e => setSort(e.target.value)} className={commonSelectStyles}>
+                               <option value="date-asc">Date (Asc)</option>
+                               <option value="date-desc">Date (Desc)</option>
+                               <option value="amount-asc">Amount (Asc)</option>
+                               <option value="amount-desc">Amount (Desc)</option>
+                               <option value="a-z">A-Z</option>
+                            </select>
+                             <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className={commonSelectStyles}>
+                                 {uniqueBillTypes.map(type => <option key={type} value={type}>{type === 'All' ? 'All Types' : type}</option>)}
+                            </select>
+                             <select value={paymentFilter} onChange={e => setPaymentFilter(e.target.value)} className={commonSelectStyles}>
+                                 {uniquePaymentTypes.map(type => <option key={type} value={type}>{type === 'All' ? 'All Payment' : type}</option>)}
+                            </select>
+                             <select value={accountFilter} onChange={e => setAccountFilter(e.target.value)} className={commonSelectStyles}>
+                               <option value="All">All Accounts</option>
+                               {uniqueAccountIds.map(id => {
+                                   const account = assets.find(a => a.id === id);
+                                   if(!account) return null;
+                                   return <option key={id} value={id}>{account.name}</option>
+                               })}
+                            </select>
+                        </div>
                     </div>
-                     <div className="divide-y divide-border-color">
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {filteredAndSortedBills.map(bill => <BillListItem key={bill.id} bill={bill} assets={assets} onEdit={handleOpenModal} className={bill.id === highlightedItemId ? 'highlight-animate' : ''} />)}
                     </div>
                 </Card>

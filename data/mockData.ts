@@ -162,3 +162,54 @@ export const mockCategories: Category[] = [
 ];
 
 export const mockRules: TransactionRule[] = [];
+
+// Generate 6+ years of realistic transaction data (4 income + 4 expense per week)
+const generateHistoricalTransactions = (): Transaction[] => {
+    const transactions: Transaction[] = [];
+    const startDate = addDays(today, -365 * 6); // 6 years ago
+
+    // Base 8 transactions per week (4 income, 4 expense)
+    const baseWeeklyTransactions = [
+        // Income transactions
+        { logo: 'https://logo.clearbit.com/company.com', merchant: 'Salary Deposit', category: 'Salary', amount: 2500, type: 'income' as const, accountId: '1' },
+        { logo: 'https://logo.clearbit.com/upwork.com', merchant: 'Freelance Work', category: 'Income', amount: 450, type: 'income' as const, accountId: '1' },
+        { logo: 'https://logo.clearbit.com/ebay.com', merchant: 'eBay Sale', category: 'Income', amount: 75, type: 'income' as const, accountId: '5' },
+        { logo: 'https://logo.clearbit.com/paypal.com', merchant: 'Refund', category: 'Income', amount: 32.50, type: 'income' as const, accountId: '1' },
+
+        // Expense transactions
+        { logo: 'https://logo.clearbit.com/tesco.com', merchant: 'Tesco Groceries', category: 'Groceries', amount: 85.40, type: 'expense' as const, accountId: '1' },
+        { logo: 'https://logo.clearbit.com/shell.com', merchant: 'Shell Petrol', category: 'Transport', amount: 62.00, type: 'expense' as const, accountId: '5' },
+        { logo: 'https://logo.clearbit.com/amazon.co.uk', merchant: 'Amazon Shopping', category: 'Shopping', amount: 45.99, type: 'expense' as const, accountId: '9' },
+        { logo: 'https://logo.clearbit.com/starbucks.com', merchant: 'Starbucks Coffee', category: 'Coffee', amount: 12.50, type: 'expense' as const, accountId: '1' },
+    ];
+
+    let txId = 1000;
+    let currentDate = new Date(startDate);
+
+    // Generate transactions week by week for 6 years
+    while (currentDate <= today) {
+        baseWeeklyTransactions.forEach((baseTx, index) => {
+            const dayOffset = Math.floor(index / 1.5); // Spread across different days
+            const txDate = addDays(currentDate, dayOffset);
+
+            if (txDate <= today) {
+                transactions.push({
+                    id: `hist-${txId++}`,
+                    ...baseTx,
+                    date: txDate.toISOString(),
+                    // Add slight randomness to amounts (±10%)
+                    amount: Number((baseTx.amount * (0.9 + Math.random() * 0.2)).toFixed(2))
+                });
+            }
+        });
+
+        currentDate = addDays(currentDate, 7); // Next week
+    }
+
+    return transactions;
+};
+
+export const historicalTransactions = generateHistoricalTransactions();
+
+// Combine with existing mock transactions
+export const allTransactions = [...historicalTransactions, ...mockTransactions];

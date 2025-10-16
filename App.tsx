@@ -11,7 +11,7 @@ import Goals from './components/Goals';
 import Bills from './components/Bills';
 import Recurring from './components/Recurring';
 import Categorize from './components/Categorize';
-import { mockAssets, mockDebts, mockGoals, mockBills, mockRecurringPayments, mockTransactions, mockBudgets, mockCategories, mockRules, mockUser } from './data/mockData';
+import { mockAssets, mockDebts, mockGoals, mockBills, mockRecurringPayments, allTransactions, mockBudgets, mockCategories, mockRules, mockUser } from './data/mockData';
 import { fetchMarketData } from './services/marketData';
 import { generateNotifications } from './services/notificationService';
 // FIX: Removed `subMonths` as it was causing an import error. `addMonths` with a negative value will be used instead.
@@ -67,7 +67,7 @@ const App: React.FC = () => {
     const [goals, setGoals] = usePersistentState<Goal[]>('zenith-goals', mockGoals);
     const [bills, setBills] = usePersistentState<Bill[]>('zenith-bills', mockBills);
     const [recurringPayments, setRecurringPayments] = usePersistentState<RecurringPayment[]>('zenith-recurring', mockRecurringPayments);
-    const [transactions, setTransactions] = usePersistentState<Transaction[]>('zenith-transactions', mockTransactions);
+    const [transactions, setTransactions] = usePersistentState<Transaction[]>('zenith-transactions', allTransactions);
     const [budgets, setBudgets] = usePersistentState<Budgets>('zenith-budgets', mockBudgets);
     const [categories, setCategories] = usePersistentState<Category[]>('zenith-categories', mockCategories);
     const [rules, setRules] = usePersistentState<TransactionRule[]>('zenith-rules', mockRules);
@@ -322,7 +322,7 @@ const App: React.FC = () => {
                 break;
             case 'fullReset':
                 setAssets(mockAssets); setDebts(mockDebts); setGoals(mockGoals); setBills(mockBills);
-                setRecurringPayments(mockRecurringPayments); setTransactions(mockTransactions); setBudgets(mockBudgets);
+                setRecurringPayments(mockRecurringPayments); setTransactions(allTransactions); setBudgets(mockBudgets);
                 setCategories(mockCategories); setRules(mockRules); setNotifications([]); setCurrency('GBP');
                 setNotificationsEnabled(true); setAutoCategorize(true); setSmartSuggestions(true);
                 alert("Application data has been fully reset.");

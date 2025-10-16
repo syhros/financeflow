@@ -37,7 +37,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, navigateTo }) => {
     ];
 
     return (
-        <aside className="w-20 bg-base-bg p-4 border-r border-border-color flex flex-col items-center">
+        <aside className="w-20 h-screen bg-base-bg p-4 border-r border-border-color flex flex-col items-center sticky top-0">
             <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center mb-6">
                 <FinancialFlowIcon className="w-7 h-7 text-white" />
             </div>

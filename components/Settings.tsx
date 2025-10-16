@@ -302,13 +302,22 @@ const WipeDataModal: React.FC<{ isOpen: boolean; onClose: () => void; onWipe: (o
 }
 
 const ExportDataModal: React.FC<{isOpen: boolean, onClose: () => void, assets: Asset[], debts: Debt[]}> = ({isOpen, onClose, assets, debts}) => {
-    const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set());
+    const allAccounts = [...assets, ...debts];
+    const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set(allAccounts.map(acc => acc.id)));
     const [selectedFields, setSelectedFields] = useState<Set<string>>(new Set(['Date', 'Merchant', 'Category', 'Amount', 'Account', 'Type']));
     const [timeFrame, setTimeFrame] = useState<string>('All');
 
-    const allAccounts = [...assets, ...debts];
     const fields = ['Date', 'Merchant', 'Category', 'Amount', 'Account', 'Type'];
     const timeFrames = ['Last month', '3 months', '6 months', '1 year', 'All'];
+
+    // Reset selections when modal opens
+    React.useEffect(() => {
+        if (isOpen) {
+            setSelectedAccounts(new Set(allAccounts.map(acc => acc.id)));
+            setSelectedFields(new Set(['Date', 'Merchant', 'Category', 'Amount', 'Account', 'Type']));
+            setTimeFrame('All');
+        }
+    }, [isOpen, allAccounts]);
 
     const toggleAccount = (id: string) => {
         const newSelected = new Set(selectedAccounts);
@@ -331,8 +340,64 @@ const ExportDataModal: React.FC<{isOpen: boolean, onClose: () => void, assets: A
     };
 
     const handleExport = () => {
-        // TODO: Generate CSV with selected data
-        alert('CSV download started!');
+        // Generate CSV content
+        const csvRows: string[] = [];
+
+        // Add headers
+        const headers = Array.from(selectedFields);
+        csvRows.push(headers.join(','));
+
+        // Get transactions from localStorage (mock data for now)
+        const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+
+        // Filter by time frame
+        const now = new Date();
+        const filteredTransactions = transactions.filter((tx: any) => {
+            const txDate = new Date(tx.date);
+            if (!selectedAccounts.has(tx.accountId)) return false;
+
+            switch(timeFrame) {
+                case 'Last month':
+                    return (now.getTime() - txDate.getTime()) <= 30 * 24 * 60 * 60 * 1000;
+                case '3 months':
+                    return (now.getTime() - txDate.getTime()) <= 90 * 24 * 60 * 60 * 1000;
+                case '6 months':
+                    return (now.getTime() - txDate.getTime()) <= 180 * 24 * 60 * 60 * 1000;
+                case '1 year':
+                    return (now.getTime() - txDate.getTime()) <= 365 * 24 * 60 * 60 * 1000;
+                default:
+                    return true;
+            }
+        });
+
+        // Add data rows
+        filteredTransactions.forEach((tx: any) => {
+            const row = headers.map(field => {
+                switch(field) {
+                    case 'Date': return `"${tx.date}"`;
+                    case 'Merchant': return `"${tx.merchant}"`;
+                    case 'Category': return `"${tx.category}"`;
+                    case 'Amount': return tx.amount;
+                    case 'Account': return `"${tx.accountId}"`;
+                    case 'Type': return `"${tx.type}"`;
+                    default: return '';
+                }
+            });
+            csvRows.push(row.join(','));
+        });
+
+        // Create and download CSV file
+        const csvContent = csvRows.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `transactions_export_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
         onClose();
     };
 
@@ -340,9 +405,14 @@ const ExportDataModal: React.FC<{isOpen: boolean, onClose: () => void, assets: A
 
     return (
          <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" onClick={onClose}>
-            <div className="bg-gray-900 rounded-lg shadow-xl w-full max-w-3xl" onClick={e => e.stopPropagation()}>
-                <div className="p-8 space-y-6">
-                    <h2 className="text-3xl font-bold text-white">Export Data</h2>
+            <div className="bg-card-bg rounded-lg shadow-xl w-full max-w-3xl border border-border-color" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center p-6 border-b border-border-color">
+                    <h2 className="text-2xl font-bold text-white">Export Data</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white">
+                        <CloseIcon className="w-6 h-6" />
+                    </button>
+                </div>
+                <div className="p-6 space-y-6"  style={{maxHeight: '80vh', overflowY: 'auto'}}>
 
                     <div>
                         <h3 className="text-lg font-semibold text-white mb-4">Select Accounts</h3>
@@ -401,12 +471,14 @@ const ExportDataModal: React.FC<{isOpen: boolean, onClose: () => void, assets: A
                         </div>
                     </div>
 
-                    <button
-                        onClick={handleExport}
-                        className="w-full max-w-md mx-auto block py-4 bg-primary text-white rounded-full font-bold text-lg hover:opacity-90 transition-opacity"
-                    >
-                        Download CSV
-                    </button>
+                    <div className="flex justify-end pt-4">
+                        <button
+                            onClick={handleExport}
+                            className="px-8 py-3 bg-primary text-white rounded-lg font-semibold hover:opacity-90 transition-opacity"
+                        >
+                            Download CSV
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

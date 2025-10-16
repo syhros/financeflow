@@ -220,7 +220,17 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, budge
     const [isTxModalOpen, setIsTxModalOpen] = useState(false);
     const [editingTx, setEditingTx] = useState<Transaction | undefined>(undefined);
     const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [perPage, setPerPage] = useState(() => {
+        const saved = localStorage.getItem('zenith-transactions-per-page');
+        return saved ? parseInt(saved) : 12;
+    });
     const { formatCurrency } = useCurrency();
+
+    // Save per page preference
+    useEffect(() => {
+        localStorage.setItem('zenith-transactions-per-page', perPage.toString());
+    }, [perPage]);
     
     useEffect(() => {
         if(filter === 'income' || filter === 'expense') {
@@ -257,6 +267,17 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, budge
         return tx.type === filter;
     });
 
+    // Pagination
+    const totalPages = Math.ceil(filteredTransactions.length / perPage);
+    const startIndex = (currentPage - 1) * perPage;
+    const endIndex = startIndex + perPage;
+    const paginatedTransactions = filteredTransactions.slice(startIndex, endIndex);
+
+    // Reset to page 1 when filter changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filter]);
+
     return (
         <>
         <AddEditTransactionModal isOpen={isTxModalOpen} onClose={() => setIsTxModalOpen(false)} transaction={editingTx} assets={assets} categories={categories} onSave={handleSaveTransaction} />
@@ -283,7 +304,44 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, budge
                             </div>
                         </div>
                          <div className="divide-y divide-border-color">
-                            {filteredTransactions.map(tx => <TransactionItem key={tx.id} tx={tx} onEdit={handleOpenTxModal} />)}
+                            {paginatedTransactions.map(tx => <TransactionItem key={tx.id} tx={tx} onEdit={handleOpenTxModal} />)}
+                        </div>
+                        <div className="flex justify-between items-center mt-6 pt-4 border-t border-border-color">
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-400">Per page:</span>
+                                <select
+                                    value={perPage}
+                                    onChange={(e) => setPerPage(Number(e.target.value))}
+                                    className="bg-gray-800 text-white text-sm rounded-md px-3 py-1 border border-gray-600 focus:border-primary outline-none"
+                                >
+                                    <option value={12}>12</option>
+                                    <option value={24}>24</option>
+                                    <option value={48}>48</option>
+                                    <option value={96}>96</option>
+                                </select>
+                                <span className="text-sm text-gray-400">
+                                    Showing {startIndex + 1}-{Math.min(endIndex, filteredTransactions.length)} of {filteredTransactions.length}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                    disabled={currentPage === 1}
+                                    className="px-3 py-1 text-sm rounded-md bg-gray-800 text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Previous
+                                </button>
+                                <span className="text-sm text-gray-400">
+                                    Page {currentPage} of {totalPages}
+                                </span>
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={currentPage === totalPages}
+                                    className="px-3 py-1 text-sm rounded-md bg-gray-800 text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Next
+                                </button>
+                            </div>
                         </div>
                     </Card>
                 </div>
