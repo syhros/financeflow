@@ -217,6 +217,10 @@ const App: React.FC = () => {
         setTransactions(prev => prev.map(t => t.id === updatedTransaction.id ? updatedTransaction : t));
     };
 
+    const handleImportTransactions = (importedTransactions: Transaction[]) => {
+        setTransactions(prev => [...prev, ...importedTransactions]);
+    };
+
     const handleInvestmentTransaction = (tx: Omit<Transaction, 'id'>) => {
         const assetName = marketData[tx.ticker!]?.name || tx.ticker!;
         const tickerNameForLogo = tx.ticker!.split('-')[0].toLowerCase();
@@ -379,6 +383,7 @@ const App: React.FC = () => {
                             autoCategorize={autoCategorize} onToggleAutoCategorize={() => setAutoCategorize(prev => !prev)}
                             smartSuggestions={smartSuggestions} onToggleSmartSuggestions={() => setSmartSuggestions(prev => !prev)}
                             assets={assets} debts={debts}
+                            onImportTransactions={handleImportTransactions}
                         />;
             default:
                 return <Dashboard

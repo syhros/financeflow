@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Card from './Card';
-import { Category, Currency, Asset, Debt, TransactionRule } from '../types';
+import { Category, Currency, Asset, Debt, TransactionRule, Transaction } from '../types';
 import { PlusIcon, CloseIcon, PencilIcon, TrashIcon, ShoppingBagIcon, GiftIcon, FilmIcon, CloudIcon, WrenchScrewdriverIcon, BanknotesIcon, HomeModernIcon, CarIcon, RefreshIcon, LightBulbIcon, iconMap } from './icons';
 import { useCurrency } from '../App';
 
@@ -21,6 +21,7 @@ interface SettingsProps {
     onToggleSmartSuggestions: () => void;
     assets: Asset[];
     debts: Debt[];
+    onImportTransactions: (transactions: Transaction[]) => void;
 }
 
 const availableIcons = [
@@ -301,9 +302,156 @@ const WipeDataModal: React.FC<{ isOpen: boolean; onClose: () => void; onWipe: (o
     )
 }
 
+const ImportDataModal: React.FC<{isOpen: boolean, onClose: () => void, onImport: (transactions: Transaction[]) => void}> = ({isOpen, onClose, onImport}) => {
+    const [isDragging, setIsDragging] = useState(false);
+    const [error, setError] = useState<string>('');
+    const [success, setSuccess] = useState<string>('');
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+    const handleFileSelect = (file: File) => {
+        setError('');
+        setSuccess('');
+
+        if (!file.name.endsWith('.csv')) {
+            setError('Please select a CSV file');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const text = e.target?.result as string;
+                const lines = text.split('\n').filter(line => line.trim());
+
+                if (lines.length < 2) {
+                    setError('CSV file is empty or invalid');
+                    return;
+                }
+
+                const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+                const transactions: Transaction[] = [];
+
+                for (let i = 1; i < lines.length; i++) {
+                    const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+
+                    if (values.length !== headers.length) continue;
+
+                    const transaction: any = {};
+                    headers.forEach((header, index) => {
+                        transaction[header.toLowerCase()] = values[index];
+                    });
+
+                    // Convert to Transaction format
+                    if (transaction.date && transaction.merchant && transaction.amount) {
+                        transactions.push({
+                            id: `import-${Date.now()}-${i}`,
+                            merchant: transaction.merchant,
+                            category: transaction.category || 'Uncategorized',
+                            date: transaction.date,
+                            amount: parseFloat(transaction.amount),
+                            type: transaction.type || 'expense',
+                            accountId: transaction.account || '1',
+                            logo: `https://logo.clearbit.com/${transaction.merchant.toLowerCase().replace(/\s+/g, '')}.com`
+                        });
+                    }
+                }
+
+                if (transactions.length === 0) {
+                    setError('No valid transactions found in CSV');
+                    return;
+                }
+
+                onImport(transactions);
+                setSuccess(`Successfully imported ${transactions.length} transactions!`);
+
+                setTimeout(() => {
+                    onClose();
+                }, 2000);
+            } catch (err) {
+                setError('Error parsing CSV file. Please check the format.');
+            }
+        };
+        reader.readAsText(file);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const file = e.dataTransfer.files[0];
+        if (file) handleFileSelect(file);
+    };
+
+    const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) handleFileSelect(file);
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" onClick={onClose}>
+            <div className="bg-card-bg rounded-lg shadow-xl w-full max-w-2xl border border-border-color" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center p-6 border-b border-border-color">
+                    <h2 className="text-2xl font-bold text-white">Import Data from CSV</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white">
+                        <CloseIcon className="w-6 h-6" />
+                    </button>
+                </div>
+                <div className="p-6">
+                    <div
+                        className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${
+                            isDragging ? 'border-primary bg-primary/10' : 'border-gray-600 hover:border-gray-500'
+                        }`}
+                        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                        onDragLeave={() => setIsDragging(false)}
+                        onDrop={handleDrop}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-16 h-16 mx-auto mb-4 text-gray-400">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                        </svg>
+                        <p className="text-lg text-white mb-2">Drag and drop your CSV file here</p>
+                        <p className="text-sm text-gray-400 mb-4">or</p>
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="px-6 py-2 bg-primary text-white rounded-lg font-semibold hover:opacity-90"
+                        >
+                            Browse Files
+                        </button>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".csv"
+                            onChange={handleFileInput}
+                            className="hidden"
+                        />
+                    </div>
+
+                    {error && (
+                        <div className="mt-4 p-3 bg-red-500/20 border border-red-500 rounded-lg">
+                            <p className="text-red-400 text-sm">{error}</p>
+                        </div>
+                    )}
+
+                    {success && (
+                        <div className="mt-4 p-3 bg-green-500/20 border border-green-500 rounded-lg">
+                            <p className="text-green-400 text-sm">{success}</p>
+                        </div>
+                    )}
+
+                    <div className="mt-6 p-4 bg-gray-800 rounded-lg">
+                        <p className="text-sm text-gray-300 font-semibold mb-2">CSV Format:</p>
+                        <p className="text-xs text-gray-400 font-mono">Date,Merchant,Category,Amount,Account,Type</p>
+                        <p className="text-xs text-gray-500 mt-2">Make sure your CSV matches this format for successful import.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const ExportDataModal: React.FC<{isOpen: boolean, onClose: () => void, assets: Asset[], debts: Debt[]}> = ({isOpen, onClose, assets, debts}) => {
     const allAccounts = [...assets, ...debts];
-    const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set(allAccounts.map(acc => acc.id)));
+    const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set());
     const [selectedFields, setSelectedFields] = useState<Set<string>>(new Set(['Date', 'Merchant', 'Category', 'Amount', 'Account', 'Type']));
     const [timeFrame, setTimeFrame] = useState<string>('All');
 
@@ -317,7 +465,7 @@ const ExportDataModal: React.FC<{isOpen: boolean, onClose: () => void, assets: A
             setSelectedFields(new Set(['Date', 'Merchant', 'Category', 'Amount', 'Account', 'Type']));
             setTimeFrame('All');
         }
-    }, [isOpen, allAccounts]);
+    }, [isOpen]);
 
     const toggleAccount = (id: string) => {
         const newSelected = new Set(selectedAccounts);
@@ -347,8 +495,8 @@ const ExportDataModal: React.FC<{isOpen: boolean, onClose: () => void, assets: A
         const headers = Array.from(selectedFields);
         csvRows.push(headers.join(','));
 
-        // Get transactions from localStorage (mock data for now)
-        const transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
+        // Get transactions from localStorage
+        const transactions = JSON.parse(localStorage.getItem('zenith-transactions') || '[]');
 
         // Filter by time frame
         const now = new Date();
@@ -499,11 +647,12 @@ const ToggleSwitch: React.FC<{ enabled: boolean; onToggle: () => void }> = ({ en
 );
 
 const Settings: React.FC<SettingsProps> = (props) => {
-    const { categories, onAddCategory, onUpdateCategory, onDeleteCategory, rules, onAddRule, onDeleteRule, onWipeData, notificationsEnabled, onToggleNotifications, autoCategorize, onToggleAutoCategorize, smartSuggestions, onToggleSmartSuggestions, assets, debts } = props;
+    const { categories, onAddCategory, onUpdateCategory, onDeleteCategory, rules, onAddRule, onDeleteRule, onWipeData, notificationsEnabled, onToggleNotifications, autoCategorize, onToggleAutoCategorize, smartSuggestions, onToggleSmartSuggestions, assets, debts, onImportTransactions } = props;
     const [isCatModalOpen, setIsCatModalOpen] = useState(false);
     const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
     const [isWipeModalOpen, setIsWipeModalOpen] = useState(false);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const { currency, setCurrency } = useCurrency();
 
     const currencyMap: {[key in Currency]: string} = { 'GBP': 'GBP (£)', 'USD': 'USD ($)', 'EUR': 'EUR (€)' };
@@ -514,6 +663,7 @@ const Settings: React.FC<SettingsProps> = (props) => {
             <TransactionRulesModal isOpen={isRulesModalOpen} onClose={() => setIsRulesModalOpen(false)} rules={rules} categories={categories} onAddRule={onAddRule} onDeleteRule={onDeleteRule} />
             <WipeDataModal isOpen={isWipeModalOpen} onClose={() => setIsWipeModalOpen(false)} onWipe={onWipeData} />
             <ExportDataModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} assets={assets} debts={debts} />
+            <ImportDataModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onImport={onImportTransactions} />
 
             <div className="space-y-8 max-w-4xl mx-auto">
                 <h1 className="text-3xl font-bold text-white">Settings</h1>
@@ -557,6 +707,9 @@ const Settings: React.FC<SettingsProps> = (props) => {
                         <Card>
                             <SettingRow title="Export All Data to CSV" onClick={() => setIsExportModalOpen(true)}>
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-400"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                            </SettingRow>
+                            <SettingRow title="Import Data from CSV" onClick={() => setIsImportModalOpen(true)}>
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-400"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
                             </SettingRow>
                             <SettingRow title="Wipe and Reset" isDanger onClick={() => setIsWipeModalOpen(true)}>
                                 <svg className="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
