@@ -3,12 +3,14 @@ import Card from './Card';
 import { Debt, Transaction } from '../types';
 import { PlusIcon, PencilIcon, CloseIcon, iconMap } from './icons';
 import { useCurrency } from '../App';
+import AccountDetailModal from './AccountDetailModal';
 
 interface DebtsProps {
     debts: Debt[];
     onAddDebt: (debt: Omit<Debt, 'id'>) => void;
     onUpdateDebt: (debt: Debt, oldBalance?: number) => void;
     onAddTransaction?: (transaction: Omit<Transaction, 'id'>) => void;
+    transactions?: Transaction[];
 }
 
 const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; }> = ({ isOpen, onClose, title, children }) => {
@@ -157,7 +159,7 @@ const AddEditDebtModal: React.FC<{ isOpen: boolean; onClose: () => void; debt?: 
 };
 
 
-const DebtAccountCard: React.FC<{ debt: Debt; onEdit: (acc: Debt) => void }> = ({ debt, onEdit }) => {
+const DebtAccountCard: React.FC<{ debt: Debt; onEdit: (acc: Debt) => void; onClick?: (debt: Debt) => void }> = ({ debt, onEdit, onClick }) => {
     const { formatCurrency } = useCurrency();
     const progress = debt.originalBalance > 0 ? ((debt.originalBalance - debt.balance) / debt.originalBalance) * 100 : 0;
     const Icon = iconMap[debt.icon];
@@ -201,7 +203,7 @@ const DebtAccountCard: React.FC<{ debt: Debt; onEdit: (acc: Debt) => void }> = (
     const { label, value } = calculatePayoff();
     
     return (
-        <Card className={`${debt.status === 'Closed' ? 'opacity-60' : ''}`}>
+        <Card className={`cursor-pointer hover:border-primary/50 transition-colors ${debt.status === 'Closed' ? 'opacity-60' : ''}`} onClick={() => onClick?.(debt)}>
             <div className="flex justify-between items-start">
                 <div className="flex items-center gap-4">
                     <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${debt.color}`}>{Icon && <Icon className="h-6 w-6 text-white" />}</div>
@@ -255,11 +257,13 @@ const DebtAccountCard: React.FC<{ debt: Debt; onEdit: (acc: Debt) => void }> = (
     );
 };
 
-const Debts: React.FC<DebtsProps> = ({ debts, onAddDebt, onUpdateDebt, onAddTransaction }) => {
+const Debts: React.FC<DebtsProps> = ({ debts, onAddDebt, onUpdateDebt, onAddTransaction, transactions = [] }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingDebt, setEditingDebt] = useState<Debt | undefined>(undefined);
     const [showClosed, setShowClosed] = useState(false);
     const [sort, setSort] = useState('default');
+    const [detailModalOpen, setDetailModalOpen] = useState(false);
+    const [selectedDebt, setSelectedDebt] = useState<Debt | undefined>(undefined);
     const { formatCurrency } = useCurrency();
 
     const totalBalance = useMemo(() => debts.filter(d => d.status === 'Active').reduce((sum, acc) => sum + acc.balance, 0), [debts]);
@@ -339,7 +343,7 @@ const Debts: React.FC<DebtsProps> = ({ debts, onAddDebt, onUpdateDebt, onAddTran
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {sortedDebts.map(acc => <DebtAccountCard key={acc.id} debt={acc} onEdit={handleOpenModal} />)}
+                        {sortedDebts.map(acc => <DebtAccountCard key={acc.id} debt={acc} onEdit={handleOpenModal} onClick={(debt) => { setSelectedDebt(debt); setDetailModalOpen(true); }} />)}
                     </div>
                 </div>
 
@@ -350,11 +354,20 @@ const Debts: React.FC<DebtsProps> = ({ debts, onAddDebt, onUpdateDebt, onAddTran
                     </button>
                     {showClosed && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {closedDebts.map(acc => <DebtAccountCard key={acc.id} debt={acc} onEdit={handleOpenModal}/>)}
+                            {closedDebts.map(acc => <DebtAccountCard key={acc.id} debt={acc} onEdit={handleOpenModal} onClick={(debt) => { setSelectedDebt(debt); setDetailModalOpen(true); }} />)}
                         </div>
                     )}
                 </div>
             </div>
+            {selectedDebt && (
+                <AccountDetailModal
+                    isOpen={detailModalOpen}
+                    onClose={() => { setDetailModalOpen(false); setSelectedDebt(undefined); }}
+                    account={selectedDebt}
+                    accountType="debt"
+                    transactions={transactions}
+                />
+            )}
         </>
     );
 };

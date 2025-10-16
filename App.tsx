@@ -462,9 +462,9 @@ const App: React.FC = () => {
             case Page.Transactions:
                 return <Transactions transactions={transactions} assets={assets} debts={debts} budgets={budgets} categories={categories} onAddTransaction={handleAddTransaction} onUpdateTransaction={handleUpdateTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateBudgets={handleUpdateBudgets} />;
             case Page.Accounts:
-                return <Accounts assets={assets} marketData={marketData} onAddAsset={handleAddAsset} onUpdateAsset={handleUpdateAsset} onAddTransaction={handleAddTransaction} />;
+                return <Accounts assets={assets} marketData={marketData} onAddAsset={handleAddAsset} onUpdateAsset={handleUpdateAsset} onAddTransaction={handleAddTransaction} transactions={transactions} />;
             case Page.Debts:
-                return <Debts debts={debts} onAddDebt={handleAddDebt} onUpdateDebt={handleUpdateDebt} onAddTransaction={handleAddTransaction} />;
+                return <Debts debts={debts} onAddDebt={handleAddDebt} onUpdateDebt={handleUpdateDebt} onAddTransaction={handleAddTransaction} transactions={transactions} />;
             case Page.Trends:
                 return <Trends assets={assets} debts={debts} transactions={transactions} />;
             case Page.Goals:

@@ -4,6 +4,7 @@ import { Asset, MarketData, Holding, Transaction } from '../types';
 import { PlusIcon, PencilIcon, CloseIcon, iconMap } from './icons';
 import { mockAssets } from '../data/mockData';
 import { useCurrency } from '../App';
+import AccountDetailModal from './AccountDetailModal';
 
 interface AccountsProps {
     assets: Asset[];
@@ -11,6 +12,7 @@ interface AccountsProps {
     onAddAsset: (asset: Omit<Asset, 'id'>) => void;
     onUpdateAsset: (asset: Asset, oldBalance?: number) => void;
     onAddTransaction?: (transaction: Omit<Transaction, 'id'>) => void;
+    transactions: Transaction[];
 }
 
 const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; className?: string }> = ({ isOpen, onClose, title, children, className }) => {
@@ -155,13 +157,13 @@ const AddEditAccountModal: React.FC<{ isOpen: boolean; onClose: () => void; asse
     );
 };
 
-const AssetAccountCard: React.FC<{ asset: Asset; onEdit: (acc: Asset) => void }> = ({ asset, onEdit }) => {
+const AssetAccountCard: React.FC<{ asset: Asset; onEdit: (acc: Asset) => void; onClick?: (acc: Asset) => void }> = ({ asset, onEdit, onClick }) => {
     const { formatCurrency } = useCurrency();
     const Icon = iconMap[asset.icon];
     const monthlyEarnings = asset.interestRate && asset.balance ? (asset.interestRate * asset.balance) / 100 / 12 : 0;
 
     return (
-        <Card className={`flex items-center justify-between ${asset.status === 'Closed' ? 'opacity-60' : ''}`}>
+        <Card className={`flex items-center justify-between cursor-pointer hover:border-primary/50 transition-colors ${asset.status === 'Closed' ? 'opacity-60' : ''}`} onClick={() => onClick?.(asset)}>
             <div className="flex items-center">
                 <div className={`w-12 h-12 rounded-lg flex items-center justify-center mr-4 ${asset.color}`}>{Icon && <Icon className="h-6 w-6 text-white" />}</div>
                 <div>
@@ -178,17 +180,19 @@ const AssetAccountCard: React.FC<{ asset: Asset; onEdit: (acc: Asset) => void }>
                     )}
                     <p className="text-xs text-gray-400">Updated {asset.lastUpdated}</p>
                 </div>
-                {asset.status === 'Active' && <button onClick={() => onEdit(asset)} className="text-gray-500 hover:text-white"><PencilIcon className="w-4 h-4" /></button>}
+                {asset.status === 'Active' && <button onClick={(e) => { e.stopPropagation(); onEdit(asset); }} className="text-gray-500 hover:text-white"><PencilIcon className="w-4 h-4" /></button>}
             </div>
         </Card>
     );
 };
 
-const Accounts: React.FC<AccountsProps> = ({ assets, marketData, onAddAsset, onUpdateAsset, onAddTransaction }) => {
+const Accounts: React.FC<AccountsProps> = ({ assets, marketData, onAddAsset, onUpdateAsset, onAddTransaction, transactions = [] }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingAsset, setEditingAsset] = useState<Asset | undefined>(undefined);
     const [showClosed, setShowClosed] = useState(false);
     const [sort, setSort] = useState('default');
+    const [detailModalOpen, setDetailModalOpen] = useState(false);
+    const [selectedAccount, setSelectedAccount] = useState<Asset | undefined>(undefined);
     const { formatCurrency } = useCurrency();
 
     const totalBalance = useMemo(() => assets.filter(a => a.status === 'Active').reduce((sum, acc) => sum + acc.balance, 0), [assets]);
@@ -267,7 +271,7 @@ const Accounts: React.FC<AccountsProps> = ({ assets, marketData, onAddAsset, onU
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {sortedAccounts.map(acc => <AssetAccountCard key={acc.id} asset={acc} onEdit={handleOpenModal} />)}
+                        {sortedAccounts.map(acc => <AssetAccountCard key={acc.id} asset={acc} onEdit={handleOpenModal} onClick={(acc) => { setSelectedAccount(acc); setDetailModalOpen(true); }} />)}
                     </div>
                 </div>
 
@@ -278,11 +282,20 @@ const Accounts: React.FC<AccountsProps> = ({ assets, marketData, onAddAsset, onU
                     </button>
                     {showClosed && (
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {closedAccounts.map(acc => <AssetAccountCard key={acc.id} asset={acc} onEdit={handleOpenModal}/>)}
+                            {closedAccounts.map(acc => <AssetAccountCard key={acc.id} asset={acc} onEdit={handleOpenModal} onClick={(acc) => { setSelectedAccount(acc); setDetailModalOpen(true); }} />)}
                         </div>
                     )}
                 </div>
             </div>
+            {selectedAccount && (
+                <AccountDetailModal
+                    isOpen={detailModalOpen}
+                    onClose={() => { setDetailModalOpen(false); setSelectedAccount(undefined); }}
+                    account={selectedAccount}
+                    accountType="asset"
+                    transactions={transactions}
+                />
+            )}
         </>
     );
 };
