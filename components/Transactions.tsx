@@ -261,7 +261,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, budge
         <>
         <AddEditTransactionModal isOpen={isTxModalOpen} onClose={() => setIsTxModalOpen(false)} transaction={editingTx} assets={assets} categories={categories} onSave={handleSaveTransaction} />
         <EditBudgetsModal isOpen={isBudgetModalOpen} onClose={() => setIsBudgetModalOpen(false)} budgets={budgets} onSave={onUpdateBudgets} />
-        <div className="space-y-8">
+        <div className="max-w-7xl mx-auto space-y-8">
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold text-white">Transactions</h1>
                  <button onClick={() => handleOpenTxModal()} className="flex items-center bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">

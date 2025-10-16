@@ -272,7 +272,7 @@ const Goals: React.FC<GoalsProps> = ({ goals, assets, onAddGoal, onUpdateGoal, h
     return (
         <>
         <AddEditGoalModal isOpen={isModalOpen} onClose={handleCloseModal} goal={selectedGoal} assets={assets} onSave={handleSave} />
-        <div className="space-y-8">
+        <div className="max-w-7xl mx-auto space-y-8">
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold text-white">Goals</h1>
                 <button onClick={() => handleOpenModal()} className="flex items-center bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">

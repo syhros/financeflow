@@ -215,7 +215,7 @@ const Accounts: React.FC<AccountsProps> = ({ assets, marketData, onAddAsset, onU
     return (
         <>
             <AddEditAccountModal isOpen={isModalOpen} onClose={handleCloseModal} asset={editingAsset} onSave={handleSave} marketData={marketData} />
-            <div className="space-y-8">
+            <div className="max-w-7xl mx-auto space-y-8">
                 <div className="flex justify-between items-center">
                     <h1 className="text-3xl font-bold text-white">Accounts (Assets)</h1>
                     <button onClick={() => handleOpenModal()} className="flex items-center bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">

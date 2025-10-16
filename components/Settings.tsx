@@ -302,32 +302,109 @@ const WipeDataModal: React.FC<{ isOpen: boolean; onClose: () => void; onWipe: (o
 }
 
 const ExportDataModal: React.FC<{isOpen: boolean, onClose: () => void, assets: Asset[], debts: Debt[]}> = ({isOpen, onClose, assets, debts}) => {
+    const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set());
+    const [selectedFields, setSelectedFields] = useState<Set<string>>(new Set(['Date', 'Merchant', 'Category', 'Amount', 'Account', 'Type']));
+    const [timeFrame, setTimeFrame] = useState<string>('All');
+
+    const allAccounts = [...assets, ...debts];
+    const fields = ['Date', 'Merchant', 'Category', 'Amount', 'Account', 'Type'];
+    const timeFrames = ['Last month', '3 months', '6 months', '1 year', 'All'];
+
+    const toggleAccount = (id: string) => {
+        const newSelected = new Set(selectedAccounts);
+        if (newSelected.has(id)) {
+            newSelected.delete(id);
+        } else {
+            newSelected.add(id);
+        }
+        setSelectedAccounts(newSelected);
+    };
+
+    const toggleField = (field: string) => {
+        const newSelected = new Set(selectedFields);
+        if (newSelected.has(field)) {
+            newSelected.delete(field);
+        } else {
+            newSelected.add(field);
+        }
+        setSelectedFields(newSelected);
+    };
+
+    const handleExport = () => {
+        // TODO: Generate CSV with selected data
+        alert('CSV download started!');
+        onClose();
+    };
+
     if (!isOpen) return null;
+
     return (
          <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" onClick={onClose}>
-            <div className="bg-card-bg rounded-lg shadow-xl w-full max-w-lg border border-border-color" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center p-4 border-b border-border-color">
-                    <h2 className="text-xl font-bold text-white">Export Data</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white"><CloseIcon className="w-6 h-6" /></button>
-                </div>
-                <div className="p-6 space-y-4">
+            <div className="bg-gray-900 rounded-lg shadow-xl w-full max-w-3xl" onClick={e => e.stopPropagation()}>
+                <div className="p-8 space-y-6">
+                    <h2 className="text-3xl font-bold text-white">Export Data</h2>
+
                     <div>
-                        <h3 className="font-semibold text-white mb-2">Select Accounts</h3>
-                        <div className="space-y-2 max-h-40 overflow-y-auto p-2 bg-gray-800 rounded-md">
-                            {[...assets, ...debts].map(acc => (
-                                <label key={acc.id} className="flex items-center"><input type="checkbox" defaultChecked className="h-4 w-4 mr-3 text-primary bg-gray-700 border-gray-600 rounded focus:ring-primary" />{acc.name}</label>
+                        <h3 className="text-lg font-semibold text-white mb-4">Select Accounts</h3>
+                        <div className="grid grid-cols-3 gap-3">
+                            {allAccounts.map(acc => (
+                                <button
+                                    key={acc.id}
+                                    onClick={() => toggleAccount(acc.id)}
+                                    className={`px-6 py-4 rounded-full font-semibold transition-all ${
+                                        selectedAccounts.has(acc.id)
+                                            ? 'bg-primary text-white'
+                                            : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                                    }`}
+                                >
+                                    {acc.name}
+                                </button>
                             ))}
                         </div>
                     </div>
-                     <div>
-                        <h3 className="font-semibold text-white mb-2">Select Fields</h3>
-                        <div className="grid grid-cols-2 gap-2">
-                            {['Date', 'Merchant', 'Category', 'Amount', 'Account', 'Type'].map(field => (
-                                 <label key={field} className="flex items-center"><input type="checkbox" defaultChecked className="h-4 w-4 mr-3 text-primary bg-gray-700 border-gray-600 rounded focus:ring-primary" />{field}</label>
+
+                    <div>
+                        <h3 className="text-lg font-semibold text-white mb-4">Select Fields</h3>
+                        <div className="grid grid-cols-3 gap-3">
+                            {fields.map(field => (
+                                <button
+                                    key={field}
+                                    onClick={() => toggleField(field)}
+                                    className={`px-6 py-4 rounded-full font-semibold transition-all ${
+                                        selectedFields.has(field)
+                                            ? 'bg-primary text-white'
+                                            : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                                    }`}
+                                >
+                                    {field}
+                                </button>
                             ))}
                         </div>
                     </div>
-                     <button onClick={() => {alert('CSV download started!'); onClose();}} className="w-full py-3 mt-4 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-500 transition-colors">
+
+                    <div>
+                        <h3 className="text-lg font-semibold text-white mb-4">Time frame</h3>
+                        <div className="flex gap-3 flex-wrap">
+                            {timeFrames.map(frame => (
+                                <button
+                                    key={frame}
+                                    onClick={() => setTimeFrame(frame)}
+                                    className={`px-8 py-3 rounded-full font-semibold transition-all ${
+                                        timeFrame === frame
+                                            ? 'bg-primary text-white'
+                                            : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                                    }`}
+                                >
+                                    {frame}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={handleExport}
+                        className="w-full max-w-md mx-auto block py-4 bg-primary text-white rounded-full font-bold text-lg hover:opacity-90 transition-opacity"
+                    >
                         Download CSV
                     </button>
                 </div>

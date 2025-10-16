@@ -1,6 +1,6 @@
 import React from 'react';
 import { Page } from '../types';
-import { HomeIcon, TransactionsIcon, AccountsIcon, TrendsIcon, GoalsIcon, BillsIcon, CategorizeIcon, SettingsIcon, ReceiptIcon, RefreshIcon, FinancialFlowIcon } from './icons';
+import { HomeIcon, TransactionsIcon, AccountsIcon, TrendsIcon, GoalsIcon, BillsIcon, CategorizeIcon, SettingsIcon, DebtsIcon, RecurringIcon, FinancialFlowIcon } from './icons';
 
 interface SidebarProps {
     currentPage: Page;
@@ -24,11 +24,11 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, navigateTo }) => {
         { icon: HomeIcon, label: Page.Dashboard },
         { icon: TransactionsIcon, label: Page.Transactions },
         { icon: AccountsIcon, label: Page.Accounts },
-        { icon: ReceiptIcon, label: Page.Debts },
+        { icon: DebtsIcon, label: Page.Debts },
         { icon: TrendsIcon, label: Page.Trends },
         { icon: GoalsIcon, label: Page.Goals },
         { icon: BillsIcon, label: Page.Bills },
-        { icon: RefreshIcon, label: Page.Recurring },
+        { icon: RecurringIcon, label: Page.Recurring },
         { icon: CategorizeIcon, label: Page.Categorize },
     ];
 
