@@ -14,6 +14,7 @@ interface TransactionsProps {
     categories: Category[];
     onAddTransaction: (transaction: Omit<Transaction, 'id'>) => void;
     onUpdateTransaction: (transaction: Transaction) => void;
+    onDeleteTransaction: (transactionId: string) => void;
     onUpdateBudgets: (budgets: Budgets) => void;
 }
 
@@ -32,8 +33,9 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; chi
     );
 };
 
-const AddEditTransactionModal: React.FC<{ isOpen: boolean; onClose: () => void; transaction?: Transaction; assets: Asset[]; debts: Debt[]; categories: Category[]; onSave: (transaction: any) => void; }> = ({ isOpen, onClose, transaction, assets, debts, categories, onSave }) => {
+const AddEditTransactionModal: React.FC<{ isOpen: boolean; onClose: () => void; transaction?: Transaction; assets: Asset[]; debts: Debt[]; categories: Category[]; onSave: (transaction: any) => void; onDelete?: (transactionId: string) => void; }> = ({ isOpen, onClose, transaction, assets, debts, categories, onSave, onDelete }) => {
     const [formData, setFormData] = useState<any>({});
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const { currency } = useCurrency();
     const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
 
@@ -77,6 +79,14 @@ const AddEditTransactionModal: React.FC<{ isOpen: boolean; onClose: () => void; 
         }
         onSave(dataToSave);
         onClose();
+    };
+
+    const handleDelete = () => {
+        if (transaction?.id && onDelete) {
+            onDelete(transaction.id);
+            onClose();
+            setShowDeleteConfirm(false);
+        }
     };
 
     const commonInputStyles = "w-full bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-primary outline-none transition-colors";
@@ -149,9 +159,22 @@ const AddEditTransactionModal: React.FC<{ isOpen: boolean; onClose: () => void; 
                     </>
                 )}
                  <div><label htmlFor="date" className={labelStyles}>Date & Time</label><input type="datetime-local" id="date" value={formData.date || ''} onChange={handleChange} className={commonInputStyles} /></div>
-                
+
+                {showDeleteConfirm && (
+                    <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-4">
+                        <p className="text-white font-semibold mb-3">Confirm deletion</p>
+                        <div className="flex gap-3">
+                            <button onClick={handleDelete} className="flex-1 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors">Yes</button>
+                            <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-2 bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-600 transition-colors">No</button>
+                        </div>
+                    </div>
+                )}
+
                 <div className="flex gap-4 pt-4">
                     <button className="w-full py-3 bg-gray-700 text-white rounded-full font-semibold hover:bg-gray-600 transition-colors" onClick={onClose}>Cancel</button>
+                    {transaction && onDelete && (
+                        <button onClick={() => setShowDeleteConfirm(true)} className="w-full py-3 bg-red-600 text-white rounded-full font-semibold hover:bg-red-700 transition-colors">Delete</button>
+                    )}
                     <button onClick={handleSave} className="w-full py-3 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-500 transition-colors">{transaction ? 'Update' : 'Add'}</button>
                 </div>
             </div>
@@ -197,12 +220,15 @@ const EditBudgetsModal: React.FC<{ isOpen: boolean; onClose: () => void; budgets
 };
 
 
-const TransactionItem: React.FC<{ tx: Transaction, onEdit: (tx: Transaction) => void }> = ({ tx, onEdit }) => {
+const TransactionItem: React.FC<{ tx: Transaction, onEdit: (tx: Transaction) => void, isSelecting?: boolean, isSelected?: boolean, onToggleSelect?: (txId: string) => void }> = ({ tx, onEdit, isSelecting, isSelected, onToggleSelect }) => {
     const { formatCurrency } = useCurrency();
     return (
         <div className="flex items-center justify-between py-4">
-            <div className="flex items-center">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center mr-4 bg-gray-700">
+            <div className="flex items-center gap-3">
+                {isSelecting && (
+                    <input type="checkbox" checked={isSelected} onChange={() => onToggleSelect?.(tx.id)} className="w-5 h-5 rounded border-gray-500 text-primary focus:ring-primary" />
+                )}
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-gray-700">
                     <img src={tx.logo} alt={tx.merchant} className="w-6 h-6 rounded-md" />
                 </div>
                 <div>
@@ -214,13 +240,13 @@ const TransactionItem: React.FC<{ tx: Transaction, onEdit: (tx: Transaction) => 
                 <p className={`font-bold ${tx.type === 'income' ? 'text-primary' : 'text-white'}`}>
                     {tx.type === 'income' ? '+' : tx.type === 'investing' ? '' : '-'}{formatCurrency(tx.amount).replace(/[+-]/g, '')}
                 </p>
-                <button onClick={() => onEdit(tx)} className="text-gray-500 hover:text-white"><PencilIcon className="w-4 h-4" /></button>
+                {!isSelecting && <button onClick={() => onEdit(tx)} className="text-gray-500 hover:text-white"><PencilIcon className="w-4 h-4" /></button>}
             </div>
         </div>
     );
 }
 
-const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts, budgets, categories, onAddTransaction, onUpdateTransaction, onUpdateBudgets }) => {
+const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts, budgets, categories, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onUpdateBudgets }) => {
     const [filter, setFilter] = useState<'all' | 'expense' | 'income' | 'investing'>('all');
     const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
     const [chartView, setChartView] = useState<'expense' | 'income'>('expense');
@@ -232,6 +258,9 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts
         const saved = localStorage.getItem('zenith-transactions-per-page');
         return saved ? parseInt(saved) : 12;
     });
+    const [isSelecting, setIsSelecting] = useState(false);
+    const [selectedTxIds, setSelectedTxIds] = useState<string[]>([]);
+    const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
     const { formatCurrency } = useCurrency();
 
     // Save per page preference
@@ -259,6 +288,27 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts
             onAddTransaction(data);
         }
     }
+
+    const handleToggleSelect = (txId: string) => {
+        if (selectedTxIds.includes(txId)) {
+            setSelectedTxIds(selectedTxIds.filter(id => id !== txId));
+        } else {
+            setSelectedTxIds([...selectedTxIds, txId]);
+        }
+    };
+
+    const handleCancelSelect = () => {
+        setIsSelecting(false);
+        setSelectedTxIds([]);
+        setShowBulkDeleteConfirm(false);
+    };
+
+    const handleBulkDelete = () => {
+        selectedTxIds.forEach(txId => {
+            onDeleteTransaction(txId);
+        });
+        handleCancelSelect();
+    };
 
     const { totalExpenses, totalIncome } = useMemo(() => {
         const now = new Date();
@@ -307,7 +357,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts
 
     return (
         <>
-        <AddEditTransactionModal isOpen={isTxModalOpen} onClose={() => setIsTxModalOpen(false)} transaction={editingTx} assets={assets} debts={debts} categories={categories} onSave={handleSaveTransaction} />
+        <AddEditTransactionModal isOpen={isTxModalOpen} onClose={() => setIsTxModalOpen(false)} transaction={editingTx} assets={assets} debts={debts} categories={categories} onSave={handleSaveTransaction} onDelete={onDeleteTransaction} />
         <EditBudgetsModal isOpen={isBudgetModalOpen} onClose={() => setIsBudgetModalOpen(false)} budgets={budgets} onSave={onUpdateBudgets} />
         <div className="max-w-7xl mx-auto space-y-8">
             <div className="flex justify-between items-center">
@@ -328,27 +378,50 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts
                                     <p className="text-sm text-gray-400 mt-1">Filter and sort your transaction history</p>
                                 </div>
                             </div>
-                            <div className="flex flex-col sm:flex-row gap-3">
-                                <div className="flex space-x-1 bg-gray-900 p-1 rounded-lg">
-                                    <button onClick={() => setFilter('all')} className={`px-4 py-2 text-sm rounded-md ${filter === 'all' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>All</button>
-                                    <button onClick={() => setFilter('expense')} className={`px-4 py-2 text-sm rounded-md ${filter === 'expense' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Expenses</button>
-                                    <button onClick={() => setFilter('income')} className={`px-4 py-2 text-sm rounded-md ${filter === 'income' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Income</button>
-                                    <button onClick={() => setFilter('investing')} className={`px-4 py-2 text-sm rounded-md ${filter === 'investing' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Investing</button>
+                            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+                                <div className="flex flex-wrap gap-3">
+                                    <div className="flex space-x-1 bg-gray-900 p-1 rounded-lg">
+                                        <button onClick={() => setFilter('all')} className={`px-4 py-2 text-sm rounded-md ${filter === 'all' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>All</button>
+                                        <button onClick={() => setFilter('expense')} className={`px-4 py-2 text-sm rounded-md ${filter === 'expense' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Expenses</button>
+                                        <button onClick={() => setFilter('income')} className={`px-4 py-2 text-sm rounded-md ${filter === 'income' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Income</button>
+                                        <button onClick={() => setFilter('investing')} className={`px-4 py-2 text-sm rounded-md ${filter === 'investing' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Investing</button>
+                                    </div>
+                                    <select
+                                        value={sortBy}
+                                        onChange={(e) => setSortBy(e.target.value as any)}
+                                        className="bg-gray-900 text-white px-4 py-2 text-sm rounded-lg border border-gray-700 focus:border-primary outline-none"
+                                    >
+                                        <option value="date-desc">Date (Newest First)</option>
+                                        <option value="date-asc">Date (Oldest First)</option>
+                                        <option value="amount-desc">Amount (High to Low)</option>
+                                        <option value="amount-asc">Amount (Low to High)</option>
+                                    </select>
                                 </div>
-                                <select
-                                    value={sortBy}
-                                    onChange={(e) => setSortBy(e.target.value as any)}
-                                    className="bg-gray-900 text-white px-4 py-2 text-sm rounded-lg border border-gray-700 focus:border-primary outline-none"
-                                >
-                                    <option value="date-desc">Date (Newest First)</option>
-                                    <option value="date-asc">Date (Oldest First)</option>
-                                    <option value="amount-desc">Amount (High to Low)</option>
-                                    <option value="amount-asc">Amount (Low to High)</option>
-                                </select>
+                                <div className="flex gap-2">
+                                    {isSelecting ? (
+                                        <>
+                                            {selectedTxIds.length > 0 && (
+                                                <button onClick={() => setShowBulkDeleteConfirm(true)} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors">Delete All ({selectedTxIds.length})</button>
+                                            )}
+                                            <button onClick={handleCancelSelect} className="px-4 py-2 text-sm bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-600 transition-colors">Cancel</button>
+                                        </>
+                                    ) : (
+                                        <button onClick={() => setIsSelecting(true)} className="px-4 py-2 text-sm bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-600 transition-colors">Select</button>
+                                    )}
+                                </div>
                             </div>
                         </div>
+                        {showBulkDeleteConfirm && (
+                            <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-4 mb-4">
+                                <p className="text-white font-semibold mb-3">Are you sure you want to delete {selectedTxIds.length} transaction{selectedTxIds.length !== 1 ? 's' : ''}? This cannot be undone.</p>
+                                <div className="flex gap-3">
+                                    <button onClick={handleBulkDelete} className="flex-1 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors">Yes</button>
+                                    <button onClick={() => setShowBulkDeleteConfirm(false)} className="flex-1 py-2 bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-600 transition-colors">No</button>
+                                </div>
+                            </div>
+                        )}
                          <div className="divide-y divide-border-color">
-                            {paginatedTransactions.map(tx => <TransactionItem key={tx.id} tx={tx} onEdit={handleOpenTxModal} />)}
+                            {paginatedTransactions.map(tx => <TransactionItem key={tx.id} tx={tx} onEdit={handleOpenTxModal} isSelecting={isSelecting} isSelected={selectedTxIds.includes(tx.id)} onToggleSelect={handleToggleSelect} />)}
                         </div>
                         <div className="flex justify-between items-center mt-6 pt-4 border-t border-border-color">
                             <div className="flex items-center gap-2">

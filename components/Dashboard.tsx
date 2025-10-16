@@ -431,6 +431,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
     const { navigateTo, assets, debts, bills, transactions, user, onUpdateUser, notifications, onMarkAllNotificationsRead, onNotificationClick, isSummaryModalOpen, summaryTransactions, onCloseSummaryModal, theme, onToggleTheme } = props;
     const [balanceType, setBalanceType] = useState<'assets' | 'debts'>('assets');
     const [timePeriod, setTimePeriod] = useState<'Day' | 'Week' | 'Month' | 'Year'>('Month');
+    const [chartTimeFilter, setChartTimeFilter] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [isAccountSelectionOpen, setIsAccountSelectionOpen] = useState(false);
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);

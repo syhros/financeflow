@@ -281,6 +281,43 @@ const App: React.FC = () => {
         setTransactions(prev => prev.map(t => t.id === updatedTransaction.id ? updatedTransaction : t));
     };
 
+    const handleDeleteTransaction = (transactionId: string) => {
+        const transaction = transactions.find(t => t.id === transactionId);
+        if (!transaction) return;
+
+        // Reverse the transaction's effect on account/debt balances
+        setAssets(prevAssets => prevAssets.map(asset => {
+            if (asset.id === transaction.accountId) {
+                let balance = asset.balance;
+                // Reverse the transaction
+                if (transaction.type === 'income') {
+                    balance -= transaction.amount;
+                } else if (transaction.type === 'expense') {
+                    balance += transaction.amount;
+                }
+                return { ...asset, balance };
+            }
+            return asset;
+        }));
+
+        setDebts(prevDebts => prevDebts.map(debt => {
+            if (debt.id === transaction.accountId) {
+                let balance = debt.balance;
+                // Reverse the transaction (income reduces debt, expense increases debt)
+                if (transaction.type === 'income') {
+                    balance += transaction.amount;
+                } else if (transaction.type === 'expense') {
+                    balance -= transaction.amount;
+                }
+                return { ...debt, balance };
+            }
+            return debt;
+        }));
+
+        // Remove the transaction
+        setTransactions(prev => prev.filter(t => t.id !== transactionId));
+    };
+
     const handleImportTransactions = (importedTransactions: Transaction[]) => {
         setTransactions(prev => [...prev, ...importedTransactions]);
     };
@@ -423,7 +460,7 @@ const App: React.FC = () => {
                             onToggleTheme={handleToggleTheme}
                         />;
             case Page.Transactions:
-                return <Transactions transactions={transactions} assets={assets} debts={debts} budgets={budgets} categories={categories} onAddTransaction={handleAddTransaction} onUpdateTransaction={handleUpdateTransaction} onUpdateBudgets={handleUpdateBudgets} />;
+                return <Transactions transactions={transactions} assets={assets} debts={debts} budgets={budgets} categories={categories} onAddTransaction={handleAddTransaction} onUpdateTransaction={handleUpdateTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateBudgets={handleUpdateBudgets} />;
             case Page.Accounts:
                 return <Accounts assets={assets} marketData={marketData} onAddAsset={handleAddAsset} onUpdateAsset={handleUpdateAsset} onAddTransaction={handleAddTransaction} />;
             case Page.Debts:
