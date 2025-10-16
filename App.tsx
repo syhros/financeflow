@@ -350,6 +350,37 @@ const App: React.FC = () => {
 
     const handleImportTransactions = (importedTransactions: Transaction[]) => {
         setTransactions(prev => [...prev, ...importedTransactions]);
+
+        // Calculate balance changes per account
+        const balanceChanges = new Map<string, number>();
+
+        importedTransactions.forEach(tx => {
+            const currentChange = balanceChanges.get(tx.accountId) || 0;
+            if (tx.type === 'income') {
+                balanceChanges.set(tx.accountId, currentChange + tx.amount);
+            } else if (tx.type === 'expense') {
+                balanceChanges.set(tx.accountId, currentChange - tx.amount);
+            }
+        });
+
+        // Update asset balances
+        setAssets(prevAssets => prevAssets.map(asset => {
+            const change = balanceChanges.get(asset.id);
+            if (change !== undefined) {
+                return { ...asset, balance: asset.balance + change };
+            }
+            return asset;
+        }));
+
+        // Update debt balances
+        setDebts(prevDebts => prevDebts.map(debt => {
+            const change = balanceChanges.get(debt.id);
+            if (change !== undefined) {
+                // For debts: expenses increase debt, income decreases debt
+                return { ...debt, balance: debt.balance - change };
+            }
+            return debt;
+        }));
     };
 
     const handleInvestmentTransaction = (tx: Omit<Transaction, 'id'>) => {

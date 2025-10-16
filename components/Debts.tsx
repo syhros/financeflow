@@ -221,7 +221,7 @@ const DebtAccountCard: React.FC<{ debt: Debt; onEdit: (acc: Debt) => void; onCli
                         <p className="font-bold text-white text-xl">{formatCurrency(debt.balance)}</p>
                         <p className="text-xs text-gray-400">Updated {debt.lastUpdated}</p>
                     </div>
-                     {debt.status === 'Active' && <button onClick={() => onEdit(debt)} className="text-gray-500 hover:text-white"><PencilIcon className="w-4 h-4" /></button>}
+                     {debt.status === 'Active' && <button onClick={(e) => { e.stopPropagation(); onEdit(debt); }} className="p-2 text-gray-500 hover:text-white hover:bg-green-600 rounded-lg transition-colors"><PencilIcon className="w-4 h-4" /></button>}
                 </div>
             </div>
 

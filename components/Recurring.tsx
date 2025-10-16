@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import Card from './Card';
 import { PlusIcon, PencilIcon, CloseIcon, CalendarIcon, RefreshIcon } from './icons';
 import { RecurringPayment, Asset, Debt } from '../types';
-import { format } from 'date-fns';
+import { format, addDays, addWeeks, addMonths, addYears, isWithinInterval, startOfDay } from 'date-fns';
 import { useCurrency } from '../App';
 
 interface RecurringProps {
@@ -26,6 +26,40 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; chi
         </div>
       </div>
     );
+};
+
+// Helper function to calculate next payment date
+const calculateNextPaymentDate = (payment: RecurringPayment): Date => {
+    const startDate = new Date(payment.startDate);
+    const today = startOfDay(new Date());
+    let nextDate = new Date(startDate);
+
+    // If end date exists and has passed, return the end date
+    if (payment.endDate) {
+        const endDate = new Date(payment.endDate);
+        if (endDate < today) {
+            return endDate;
+        }
+    }
+
+    // Calculate next occurrence based on frequency
+    while (nextDate <= today) {
+        switch (payment.frequency) {
+            case 'Weekly':
+                nextDate = addWeeks(nextDate, 1);
+                break;
+            case 'Monthly':
+                nextDate = addMonths(nextDate, 1);
+                break;
+            case 'Yearly':
+                nextDate = addYears(nextDate, 1);
+                break;
+            default:
+                nextDate = addMonths(nextDate, 1);
+        }
+    }
+
+    return nextDate;
 };
 
 const AddEditRecurringModal: React.FC<{ isOpen: boolean; onClose: () => void; payment?: RecurringPayment; assets: Asset[]; debts: Debt[]; onSave: (payment: any) => void; }> = ({ isOpen, onClose, payment, assets, debts, onSave }) => {
@@ -116,11 +150,12 @@ const AddEditRecurringModal: React.FC<{ isOpen: boolean; onClose: () => void; pa
     );
 };
 
-const PaymentListItem: React.FC<{ payment: RecurringPayment; assets: Asset[]; debts: Debt[]; onEdit: (payment: RecurringPayment) => void; }> = ({ payment, assets, debts, onEdit }) => {
+const PaymentListItem: React.FC<{ payment: RecurringPayment; assets: Asset[]; debts: Debt[]; onEdit: (payment: RecurringPayment) => void; showNextDate?: boolean; }> = ({ payment, assets, debts, onEdit, showNextDate = false }) => {
     const { formatCurrency } = useCurrency();
     const fromAccount = assets.find(a => a.id === payment.fromAccountId) || debts.find(d => d.id === payment.fromAccountId);
     const toAccount = payment.toAccountId ? (assets.find(a => a.id === payment.toAccountId) || debts.find(d => d.id === payment.toAccountId)) : null;
     const typeColor = payment.type === 'Income' ? 'text-primary' : payment.type === 'Expense' ? 'text-red-400' : 'text-blue-400';
+    const nextPaymentDate = calculateNextPaymentDate(payment);
 
     return (
         <div className="flex items-center justify-between py-4">
@@ -131,9 +166,11 @@ const PaymentListItem: React.FC<{ payment: RecurringPayment; assets: Asset[]; de
                 <div>
                     <p className="font-semibold text-white">{payment.name}</p>
                     <p className="text-xs text-gray-400">
-                       {payment.type === 'Transfer' ? `${fromAccount?.name} → ${toAccount?.name}` : fromAccount?.name}
+                       {payment.type === 'Transfer'
+                            ? `${fromAccount?.name} to ${toAccount?.name}`
+                            : fromAccount?.name} • {payment.frequency}
                     </p>
-                     <p className="text-xs text-gray-500 font-semibold mt-0.5">{payment.frequency}</p>
+                     {showNextDate && <p className="text-xs text-gray-500 font-semibold mt-0.5">Next: {format(nextPaymentDate, 'MMM dd, yyyy')}</p>}
                 </div>
             </div>
             <div className="flex items-center gap-4">
@@ -141,7 +178,7 @@ const PaymentListItem: React.FC<{ payment: RecurringPayment; assets: Asset[]; de
                     <p className={`font-bold text-white text-sm ${payment.type === 'Income' ? 'text-primary' : ''}`}>{payment.type === 'Income' ? '+' : '-'}{formatCurrency(payment.amount).replace(/[+-]/g, '')}</p>
                      <p className={`text-xs font-semibold ${typeColor}`}>{payment.type}</p>
                 </div>
-                <button onClick={() => onEdit(payment)} className="text-gray-500 hover:text-white"><PencilIcon className="w-4 h-4" /></button>
+                <button onClick={() => onEdit(payment)} className="p-2 text-gray-500 hover:text-white hover:bg-green-600 rounded-lg transition-colors"><PencilIcon className="w-4 h-4" /></button>
             </div>
         </div>
     )
@@ -150,6 +187,9 @@ const PaymentListItem: React.FC<{ payment: RecurringPayment; assets: Asset[]; de
 const Recurring: React.FC<RecurringProps> = ({ payments, assets, debts, onAddPayment, onUpdatePayment }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedPayment, setSelectedPayment] = useState<RecurringPayment | undefined>(undefined);
+    const [sort, setSort] = useState('date-asc');
+    const [typeFilter, setTypeFilter] = useState('All');
+    const { formatCurrency } = useCurrency();
 
     const handleOpenModal = (payment?: RecurringPayment) => {
         setSelectedPayment(payment);
@@ -169,6 +209,95 @@ const Recurring: React.FC<RecurringProps> = ({ payments, assets, debts, onAddPay
         }
     };
 
+    // Filter out expense-type recurring payments (they should be in Bills section)
+    const nonExpensePayments = useMemo(() => {
+        return payments.filter(p => p.type !== 'Expense');
+    }, [payments]);
+
+    // Monthly Summary
+    const monthlySummary = useMemo(() => {
+        const monthly = nonExpensePayments.filter(p => p.frequency === 'Monthly').reduce((sum, p) => {
+            if (p.type === 'Income') return sum + p.amount;
+            return sum - p.amount;
+        }, 0);
+
+        const weekly = nonExpensePayments.filter(p => p.frequency === 'Weekly').reduce((sum, p) => {
+            const monthlyEquiv = (p.amount * 52) / 12;
+            if (p.type === 'Income') return sum + monthlyEquiv;
+            return sum - monthlyEquiv;
+        }, 0);
+
+        const yearly = nonExpensePayments.filter(p => p.frequency === 'Yearly').reduce((sum, p) => {
+            const monthlyEquiv = p.amount / 12;
+            if (p.type === 'Income') return sum + monthlyEquiv;
+            return sum - monthlyEquiv;
+        }, 0);
+
+        const total = monthly + weekly + yearly;
+        const income = nonExpensePayments.filter(p => p.type === 'Income').reduce((sum, p) => {
+            let monthlyAmount = p.amount;
+            if (p.frequency === 'Weekly') monthlyAmount = (p.amount * 52) / 12;
+            if (p.frequency === 'Yearly') monthlyAmount = p.amount / 12;
+            return sum + monthlyAmount;
+        }, 0);
+        const transfers = nonExpensePayments.filter(p => p.type === 'Transfer').reduce((sum, p) => {
+            let monthlyAmount = p.amount;
+            if (p.frequency === 'Weekly') monthlyAmount = (p.amount * 52) / 12;
+            if (p.frequency === 'Yearly') monthlyAmount = p.amount / 12;
+            return sum + monthlyAmount;
+        }, 0);
+
+        return { total, income, transfers };
+    }, [nonExpensePayments]);
+
+    // Upcoming Payments (next 7 days)
+    const upcomingPayments = useMemo(() => {
+        const today = startOfDay(new Date());
+        const sevenDaysFromNow = addDays(today, 7);
+
+        return nonExpensePayments
+            .map(p => ({
+                payment: p,
+                nextDate: calculateNextPaymentDate(p)
+            }))
+            .filter(({ nextDate }) => isWithinInterval(nextDate, { start: today, end: sevenDaysFromNow }))
+            .sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime())
+            .map(({ payment }) => payment);
+    }, [nonExpensePayments]);
+
+    // All Payments sorted and filtered
+    const sortedPayments = useMemo(() => {
+        let filtered = [...nonExpensePayments];
+
+        // Filter by type
+        if (typeFilter !== 'All') {
+            filtered = filtered.filter(p => p.type === typeFilter);
+        }
+
+        // Sort
+        filtered.sort((a, b) => {
+            switch (sort) {
+                case 'date-asc':
+                    return calculateNextPaymentDate(a).getTime() - calculateNextPaymentDate(b).getTime();
+                case 'date-desc':
+                    return calculateNextPaymentDate(b).getTime() - calculateNextPaymentDate(a).getTime();
+                case 'amount-asc':
+                    return a.amount - b.amount;
+                case 'amount-desc':
+                    return b.amount - a.amount;
+                case 'a-z':
+                    return a.name.localeCompare(b.name);
+                default:
+                    return 0;
+            }
+        });
+
+        return filtered;
+    }, [nonExpensePayments, sort, typeFilter]);
+
+    const uniqueTypes = ['All', ...Array.from(new Set(nonExpensePayments.map(p => p.type)))];
+    const commonSelectStyles = "bg-gray-700 text-white rounded-lg px-3 py-2 text-sm border border-gray-600 focus:border-primary outline-none";
+
     return (
         <>
         <AddEditRecurringModal isOpen={isModalOpen} onClose={handleCloseModal} payment={selectedPayment} assets={assets} debts={debts} onSave={handleSave} />
@@ -180,10 +309,55 @@ const Recurring: React.FC<RecurringProps> = ({ payments, assets, debts, onAddPay
                     Add Payment
                 </button>
             </div>
+
+            {/* Monthly Summary */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card>
+                    <h2 className="text-lg font-bold text-white mb-2">Monthly Summary</h2>
+                    <div className="space-y-2">
+                        <p className="text-xs text-gray-400">Total Monthly Net</p>
+                        <p className={`text-3xl font-bold ${monthlySummary.total >= 0 ? 'text-primary' : 'text-red-400'}`}>{formatCurrency(monthlySummary.total)}</p>
+                        <div className="pt-2 space-y-2 text-sm">
+                            <div className="flex justify-between"><span className="text-gray-400">Income</span><span className="text-primary">{formatCurrency(monthlySummary.income)}</span></div>
+                            <div className="flex justify-between"><span className="text-gray-400">Transfers</span><span className="text-blue-400">{formatCurrency(monthlySummary.transfers)}</span></div>
+                            <div className="flex justify-between pt-2 border-t border-border-color font-bold"><span className="text-white">Net</span><span className={monthlySummary.total >= 0 ? 'text-primary' : 'text-red-400'}>{formatCurrency(monthlySummary.total)}</span></div>
+                        </div>
+                    </div>
+                </Card>
+
+                {/* Upcoming Payments */}
+                <Card className="md:col-span-2">
+                    <h2 className="text-lg font-bold text-white mb-4">Upcoming Payments (Next 7 Days)</h2>
+                    <div className="divide-y divide-border-color">
+                        {upcomingPayments.length > 0 ? (
+                            upcomingPayments.map(p => <PaymentListItem key={p.id} payment={p} assets={assets} debts={debts} onEdit={handleOpenModal} showNextDate={true} />)
+                        ) : (
+                            <p className="text-gray-400 py-4 text-center text-sm">No payments due in the next 7 days.</p>
+                        )}
+                    </div>
+                </Card>
+            </div>
+
+            {/* All Payments */}
             <Card>
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-bold text-white">All Payments</h2>
+                    <div className="flex gap-2">
+                        <select value={sort} onChange={e => setSort(e.target.value)} className={commonSelectStyles}>
+                           <option value="date-asc">Date (Asc)</option>
+                           <option value="date-desc">Date (Desc)</option>
+                           <option value="amount-asc">Amount (Asc)</option>
+                           <option value="amount-desc">Amount (Desc)</option>
+                           <option value="a-z">A-Z</option>
+                        </select>
+                         <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className={commonSelectStyles}>
+                             {uniqueTypes.map(type => <option key={type} value={type}>{type === 'All' ? 'All Types' : type}</option>)}
+                        </select>
+                    </div>
+                </div>
                 <div className="divide-y divide-border-color">
-                    {payments.length > 0 ? (
-                        payments.map(p => <PaymentListItem key={p.id} payment={p} assets={assets} debts={debts} onEdit={handleOpenModal} />)
+                    {sortedPayments.length > 0 ? (
+                        sortedPayments.map(p => <PaymentListItem key={p.id} payment={p} assets={assets} debts={debts} onEdit={handleOpenModal} showNextDate={true} />)
                     ) : (
                         <p className="text-gray-400 py-8 text-center">No recurring payments set up yet.</p>
                     )}
