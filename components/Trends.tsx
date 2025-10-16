@@ -128,9 +128,9 @@ const Trends: React.FC<TrendsProps> = ({ assets, debts, transactions }) => {
                         <h2 className="text-xl font-bold text-white mb-2">Category Analysis</h2>
                         <p className="text-sm text-gray-400 mb-4">Top spending categories this {periodLabel}</p>
                         {categoryAnalysis.length > 0 ? (
-                            <div className="space-y-4">
+                            <div className="divide-y divide-border-color">
                                 {categoryAnalysis.map((cat, idx) => (
-                                    <div key={idx} className="flex justify-between items-center">
+                                    <div key={idx} className="flex justify-between items-center py-4">
                                         <div className="flex items-center flex-1">
                                             <div className={`w-4 h-4 rounded-sm mr-3 ${cat.color}`}></div>
                                             <span className="text-white text-sm">{cat.name}</span>
