@@ -22,9 +22,18 @@ interface SettingsProps {
     onToggleSmartSuggestions: () => void;
     assets: Asset[];
     debts: Debt[];
+    bills: Bill[];
+    goals: Goal[];
+    recurringPayments: RecurringPayment[];
     onImportTransactions: (transactions: Transaction[]) => void;
     onAddAsset: (asset: Omit<Asset, 'id'>) => void;
     onAddDebt: (debt: Omit<Debt, 'id'>) => void;
+    onDeleteAsset: (assetId: string) => void;
+    onDeleteDebt: (debtId: string) => void;
+    onDeleteBill: (billId: string) => void;
+    onDeleteGoal: (goalId: string) => void;
+    onDeleteRecurring: (paymentId: string) => void;
+    onDeleteTransactions: (params: { accountId?: string; level?: string; beforeDate?: string }) => void;
 }
 
 const availableIcons = [
@@ -232,6 +241,274 @@ const TransactionRulesModal: React.FC<{
     )
 };
 
+
+const CustomDataDeletionModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    assets: Asset[];
+    debts: Debt[];
+    onDeleteAccount: (accountId: string) => void;
+    onDeleteBill: (billId: string) => void;
+    onDeleteGoal: (goalId: string) => void;
+    onDeleteRecurring: (paymentId: string) => void;
+    onDeleteTransactions: (params: { accountId?: string; level?: string; beforeDate?: string }) => void;
+    bills: Bill[];
+    goals: Goal[];
+    recurringPayments: RecurringPayment[];
+}> = ({ isOpen, onClose, assets, debts, onDeleteAccount, onDeleteBill, onDeleteGoal, onDeleteRecurring, onDeleteTransactions, bills, goals, recurringPayments }) => {
+    const [step, setStep] = useState<'main' | 'account' | 'bills' | 'goals' | 'recurring'>('main');
+    const [selectedAccountId, setSelectedAccountId] = useState('');
+    const [deletionLevel, setDeletionLevel] = useState<'account-only' | 'with-transactions' | 'time-based'>('account-only');
+    const [timeFrame, setTimeFrame] = useState('all');
+    const [confirmText, setConfirmText] = useState('');
+
+    const handleReset = () => {
+        setStep('main');
+        setSelectedAccountId('');
+        setDeletionLevel('account-only');
+        setTimeFrame('all');
+        setConfirmText('');
+    };
+
+    const handleDeleteAccount = () => {
+        if (confirmText === 'DELETE') {
+            if (deletionLevel === 'account-only') {
+                onDeleteAccount(selectedAccountId);
+            } else if (deletionLevel === 'with-transactions') {
+                onDeleteTransactions({ accountId: selectedAccountId, level: 'all' });
+                onDeleteAccount(selectedAccountId);
+            } else if (deletionLevel === 'time-based') {
+                const beforeDate = timeFrame === '3months' ? addMonths(new Date(), -3).toISOString() :
+                                   timeFrame === '6months' ? addMonths(new Date(), -6).toISOString() :
+                                   timeFrame === '1year' ? addMonths(new Date(), -12).toISOString() : '';
+                if (beforeDate) {
+                    onDeleteTransactions({ accountId: selectedAccountId, beforeDate });
+                }
+            }
+            handleReset();
+            onClose();
+        } else {
+            alert('Confirmation text does not match.');
+        }
+    };
+
+    const handleDeleteBill = (billId: string) => {
+        if (window.confirm('Are you sure you want to delete this bill?')) {
+            onDeleteBill(billId);
+        }
+    };
+
+    const handleDeleteGoal = (goalId: string) => {
+        if (window.confirm('Are you sure you want to delete this goal?')) {
+            onDeleteGoal(goalId);
+        }
+    };
+
+    const handleDeleteRecurring = (paymentId: string) => {
+        if (window.confirm('Are you sure you want to delete this recurring payment?')) {
+            onDeleteRecurring(paymentId);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    const allAccounts = [...assets, ...debts];
+    const selectedAccount = allAccounts.find(a => a.id === selectedAccountId);
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" onClick={() => { handleReset(); onClose(); }}>
+            <div className="bg-card-bg rounded-lg shadow-xl w-full max-w-2xl border border-border-color max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center p-4 border-b border-border-color sticky top-0 bg-card-bg z-10">
+                    <h2 className="text-xl font-bold text-white">Custom Data Deletion</h2>
+                    <button onClick={() => { handleReset(); onClose(); }} className="text-gray-400 hover:text-white"><CloseIcon className="w-6 h-6" /></button>
+                </div>
+                <div className="p-6">
+                    {step === 'main' && (
+                        <div className="space-y-4">
+                            <p className="text-gray-300 mb-4">Choose what you want to delete:</p>
+                            <button onClick={() => setStep('account')} className="w-full p-4 bg-gray-800 hover:bg-gray-700 rounded-lg text-left transition-colors">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <p className="font-semibold text-white">Delete Individual Account</p>
+                                        <p className="text-sm text-gray-400">Remove a specific account with various deletion options</p>
+                                    </div>
+                                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                                </div>
+                            </button>
+                            <button onClick={() => setStep('bills')} className="w-full p-4 bg-gray-800 hover:bg-gray-700 rounded-lg text-left transition-colors">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <p className="font-semibold text-white">Delete Individual Bills</p>
+                                        <p className="text-sm text-gray-400">Remove specific bills or subscriptions</p>
+                                    </div>
+                                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                                </div>
+                            </button>
+                            <button onClick={() => setStep('goals')} className="w-full p-4 bg-gray-800 hover:bg-gray-700 rounded-lg text-left transition-colors">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <p className="font-semibold text-white">Delete Individual Goals</p>
+                                        <p className="text-sm text-gray-400">Remove specific savings goals</p>
+                                    </div>
+                                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                                </div>
+                            </button>
+                            <button onClick={() => setStep('recurring')} className="w-full p-4 bg-gray-800 hover:bg-gray-700 rounded-lg text-left transition-colors">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <p className="font-semibold text-white">Delete Recurring Payments</p>
+                                        <p className="text-sm text-gray-400">Remove specific recurring payments</p>
+                                    </div>
+                                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                                </div>
+                            </button>
+                        </div>
+                    )}
+
+                    {step === 'account' && !selectedAccountId && (
+                        <div className="space-y-4">
+                            <button onClick={() => setStep('main')} className="text-primary hover:text-primary/80 flex items-center gap-2 mb-2">
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+                                Back
+                            </button>
+                            <p className="text-gray-300 mb-4">Select an account to delete:</p>
+                            <div className="space-y-2 max-h-96 overflow-y-auto">
+                                {allAccounts.map(acc => (
+                                    <button key={acc.id} onClick={() => setSelectedAccountId(acc.id)} className="w-full p-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-left transition-colors">
+                                        <p className="font-semibold text-white">{acc.name}</p>
+                                        <p className="text-sm text-gray-400">{acc.type} • {'accountType' in acc && acc.accountType === 'debt' ? 'Debt' : 'Asset'}</p>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {step === 'account' && selectedAccountId && (
+                        <div className="space-y-4">
+                            <button onClick={() => setSelectedAccountId('')} className="text-primary hover:text-primary/80 flex items-center gap-2 mb-2">
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+                                Back
+                            </button>
+                            <div className="p-4 bg-gray-800 rounded-lg mb-4">
+                                <p className="text-sm text-gray-400">Deleting:</p>
+                                <p className="text-lg font-semibold text-white">{selectedAccount?.name}</p>
+                            </div>
+                            <p className="text-gray-300 mb-4">Choose deletion level:</p>
+                            <div className="space-y-3">
+                                <label className={`flex items-start p-4 rounded-lg cursor-pointer transition-all ${deletionLevel === 'account-only' ? 'bg-red-500/20 ring-2 ring-red-400' : 'bg-gray-800 hover:bg-gray-700'}`}>
+                                    <input type="radio" name="deletion-level" value="account-only" checked={deletionLevel === 'account-only'} onChange={() => setDeletionLevel('account-only')} className="mt-1 h-4 w-4 text-primary bg-gray-700 border-gray-600" />
+                                    <div className="ml-3">
+                                        <p className="font-semibold text-white">Delete Account Only</p>
+                                        <p className="text-xs text-gray-400">Remove the account but keep all transaction history</p>
+                                    </div>
+                                </label>
+                                <label className={`flex items-start p-4 rounded-lg cursor-pointer transition-all ${deletionLevel === 'with-transactions' ? 'bg-red-500/20 ring-2 ring-red-400' : 'bg-gray-800 hover:bg-gray-700'}`}>
+                                    <input type="radio" name="deletion-level" value="with-transactions" checked={deletionLevel === 'with-transactions'} onChange={() => setDeletionLevel('with-transactions')} className="mt-1 h-4 w-4 text-primary bg-gray-700 border-gray-600" />
+                                    <div className="ml-3">
+                                        <p className="font-semibold text-white">Delete Account & All Transactions</p>
+                                        <p className="text-xs text-gray-400">Remove the account and all associated transactions</p>
+                                    </div>
+                                </label>
+                                <label className={`flex items-start p-4 rounded-lg cursor-pointer transition-all ${deletionLevel === 'time-based' ? 'bg-red-500/20 ring-2 ring-red-400' : 'bg-gray-800 hover:bg-gray-700'}`}>
+                                    <input type="radio" name="deletion-level" value="time-based" checked={deletionLevel === 'time-based'} onChange={() => setDeletionLevel('time-based')} className="mt-1 h-4 w-4 text-primary bg-gray-700 border-gray-600" />
+                                    <div className="ml-3">
+                                        <p className="font-semibold text-white">Delete Old Transactions Only</p>
+                                        <p className="text-xs text-gray-400">Keep account but remove transactions older than selected period</p>
+                                    </div>
+                                </label>
+                            </div>
+                            {deletionLevel === 'time-based' && (
+                                <div className="mt-4 p-4 bg-gray-900 rounded-lg">
+                                    <p className="text-sm text-gray-300 mb-3">Delete transactions older than:</p>
+                                    <div className="flex gap-3">
+                                        {['3months', '6months', '1year', 'all'].map(option => (
+                                            <button key={option} onClick={() => setTimeFrame(option)} className={`px-4 py-2 rounded-lg font-semibold transition-all ${timeFrame === option ? 'bg-primary text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}>
+                                                {option === '3months' ? '3 Months' : option === '6months' ? '6 Months' : option === '1year' ? '1 Year' : 'All'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            <div className="pt-4 border-t border-border-color">
+                                <p className="text-gray-400 text-sm mb-3">To confirm, type <strong className="text-red-400">DELETE</strong> below:</p>
+                                <input type="text" value={confirmText} onChange={e => setConfirmText(e.target.value)} className="w-full text-center bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-red-500 outline-none mb-4" />
+                                <button onClick={handleDeleteAccount} disabled={confirmText !== 'DELETE'} className="w-full py-3 bg-red-600 text-white rounded-full font-semibold hover:bg-red-500 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors">
+                                    Delete {deletionLevel === 'account-only' ? 'Account' : deletionLevel === 'with-transactions' ? 'Account & Transactions' : 'Old Transactions'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {step === 'bills' && (
+                        <div className="space-y-4">
+                            <button onClick={() => setStep('main')} className="text-primary hover:text-primary/80 flex items-center gap-2 mb-2">
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+                                Back
+                            </button>
+                            <p className="text-gray-300 mb-4">Select bills to delete:</p>
+                            <div className="space-y-2 max-h-96 overflow-y-auto">
+                                {bills.map(bill => (
+                                    <div key={bill.id} className="flex justify-between items-center p-3 bg-gray-800 rounded-lg">
+                                        <div>
+                                            <p className="font-semibold text-white">{bill.name}</p>
+                                            <p className="text-sm text-gray-400">{bill.category} • ${bill.amount}</p>
+                                        </div>
+                                        <button onClick={() => handleDeleteBill(bill.id)} className="text-red-400 hover:text-red-300"><TrashIcon className="w-5 h-5" /></button>
+                                    </div>
+                                ))}
+                                {bills.length === 0 && <p className="text-center text-gray-500 py-4">No bills to delete</p>}
+                            </div>
+                        </div>
+                    )}
+
+                    {step === 'goals' && (
+                        <div className="space-y-4">
+                            <button onClick={() => setStep('main')} className="text-primary hover:text-primary/80 flex items-center gap-2 mb-2">
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+                                Back
+                            </button>
+                            <p className="text-gray-300 mb-4">Select goals to delete:</p>
+                            <div className="space-y-2 max-h-96 overflow-y-auto">
+                                {goals.map(goal => (
+                                    <div key={goal.id} className="flex justify-between items-center p-3 bg-gray-800 rounded-lg">
+                                        <div>
+                                            <p className="font-semibold text-white">{goal.name}</p>
+                                            <p className="text-sm text-gray-400">${goal.currentAmount} / ${goal.targetAmount}</p>
+                                        </div>
+                                        <button onClick={() => handleDeleteGoal(goal.id)} className="text-red-400 hover:text-red-300"><TrashIcon className="w-5 h-5" /></button>
+                                    </div>
+                                ))}
+                                {goals.length === 0 && <p className="text-center text-gray-500 py-4">No goals to delete</p>}
+                            </div>
+                        </div>
+                    )}
+
+                    {step === 'recurring' && (
+                        <div className="space-y-4">
+                            <button onClick={() => setStep('main')} className="text-primary hover:text-primary/80 flex items-center gap-2 mb-2">
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+                                Back
+                            </button>
+                            <p className="text-gray-300 mb-4">Select recurring payments to delete:</p>
+                            <div className="space-y-2 max-h-96 overflow-y-auto">
+                                {recurringPayments.map(payment => (
+                                    <div key={payment.id} className="flex justify-between items-center p-3 bg-gray-800 rounded-lg">
+                                        <div>
+                                            <p className="font-semibold text-white">{payment.name}</p>
+                                            <p className="text-sm text-gray-400">{payment.type} • {payment.frequency} • ${payment.amount}</p>
+                                        </div>
+                                        <button onClick={() => handleDeleteRecurring(payment.id)} className="text-red-400 hover:text-red-300"><TrashIcon className="w-5 h-5" /></button>
+                                    </div>
+                                ))}
+                                {recurringPayments.length === 0 && <p className="text-center text-gray-500 py-4">No recurring payments to delete</p>}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const WipeDataModal: React.FC<{ isOpen: boolean; onClose: () => void; onWipe: (option: string) => void; }> = ({ isOpen, onClose, onWipe }) => {
     const [step, setStep] = useState(1);
@@ -1202,10 +1479,11 @@ const ToggleSwitch: React.FC<{ enabled: boolean; onToggle: () => void }> = ({ en
 );
 
 const Settings: React.FC<SettingsProps> = (props) => {
-    const { categories, onAddCategory, onUpdateCategory, onDeleteCategory, rules, onAddRule, onDeleteRule, onWipeData, notificationsEnabled, onToggleNotifications, autoCategorize, onToggleAutoCategorize, smartSuggestions, onToggleSmartSuggestions, assets, debts, onImportTransactions, onAddAsset, onAddDebt } = props;
+    const { categories, onAddCategory, onUpdateCategory, onDeleteCategory, rules, onAddRule, onDeleteRule, onWipeData, notificationsEnabled, onToggleNotifications, autoCategorize, onToggleAutoCategorize, smartSuggestions, onToggleSmartSuggestions, assets, debts, bills, goals, recurringPayments, onImportTransactions, onAddAsset, onAddDebt, onDeleteAsset, onDeleteDebt, onDeleteBill, onDeleteGoal, onDeleteRecurring, onDeleteTransactions } = props;
     const [isCatModalOpen, setIsCatModalOpen] = useState(false);
     const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
     const [isWipeModalOpen, setIsWipeModalOpen] = useState(false);
+    const [isCustomDeletionModalOpen, setIsCustomDeletionModalOpen] = useState(false);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
@@ -1219,6 +1497,7 @@ const Settings: React.FC<SettingsProps> = (props) => {
             <ManageCategoriesModal isOpen={isCatModalOpen} onClose={() => setIsCatModalOpen(false)} categories={categories} onAddCategory={onAddCategory} onUpdateCategory={onUpdateCategory} onDeleteCategory={onDeleteCategory} />
             <TransactionRulesModal isOpen={isRulesModalOpen} onClose={() => setIsRulesModalOpen(false)} rules={rules} categories={categories} onAddRule={onAddRule} onDeleteRule={onDeleteRule} />
             <WipeDataModal isOpen={isWipeModalOpen} onClose={() => setIsWipeModalOpen(false)} onWipe={onWipeData} />
+            <CustomDataDeletionModal isOpen={isCustomDeletionModalOpen} onClose={() => setIsCustomDeletionModalOpen(false)} assets={assets} debts={debts} bills={bills} goals={goals} recurringPayments={recurringPayments} onDeleteAccount={(id) => { const asset = assets.find(a => a.id === id); const debt = debts.find(d => d.id === id); if (asset) onDeleteAsset(id); else if (debt) onDeleteDebt(id); }} onDeleteBill={onDeleteBill} onDeleteGoal={onDeleteGoal} onDeleteRecurring={onDeleteRecurring} onDeleteTransactions={onDeleteTransactions} />
             <ExportDataModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} assets={assets} debts={debts} />
             <ImportDataModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onImport={onImportTransactions} onAddAsset={onAddAsset} onAddDebt={onAddDebt} assets={assets} debts={debts} />
             <BackupDataModal isOpen={isBackupModalOpen} onClose={() => setIsBackupModalOpen(false)} />
@@ -1275,6 +1554,9 @@ const Settings: React.FC<SettingsProps> = (props) => {
                             </SettingRow>
                             <SettingRow title="Import Data from CSV" onClick={() => setIsImportModalOpen(true)}>
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-400"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
+                            </SettingRow>
+                            <SettingRow title="Custom Data Deletion" isDanger onClick={() => setIsCustomDeletionModalOpen(true)}>
+                                <svg className="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
                             </SettingRow>
                             <SettingRow title="Wipe and Reset" isDanger onClick={() => setIsWipeModalOpen(true)}>
                                 <svg className="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>

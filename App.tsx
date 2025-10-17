@@ -517,6 +517,22 @@ const App: React.FC = () => {
         }
     };
 
+    // Custom Transaction Deletion Handler
+    const handleDeleteTransactions = (params: { accountId?: string; level?: string; beforeDate?: string }) => {
+        const { accountId, level, beforeDate } = params;
+
+        if (accountId) {
+            if (level === 'all') {
+                setTransactions(prev => prev.filter(t => t.accountId !== accountId));
+            } else if (beforeDate) {
+                setTransactions(prev => prev.filter(t => {
+                    if (t.accountId !== accountId) return true;
+                    return new Date(t.date) >= new Date(beforeDate);
+                }));
+            }
+        }
+    };
+
     const uncategorizedTransactions = transactions.filter(t => t.category === 'Uncategorized');
 
     const renderPage = () => {
@@ -563,10 +579,16 @@ const App: React.FC = () => {
                             notificationsEnabled={notificationsEnabled} onToggleNotifications={() => setNotificationsEnabled(prev => !prev)}
                             autoCategorize={autoCategorize} onToggleAutoCategorize={() => setAutoCategorize(prev => !prev)}
                             smartSuggestions={smartSuggestions} onToggleSmartSuggestions={() => setSmartSuggestions(prev => !prev)}
-                            assets={assets} debts={debts}
+                            assets={assets} debts={debts} bills={bills} goals={goals} recurringPayments={recurringPayments}
                             onImportTransactions={handleImportTransactions}
                             onAddAsset={handleAddAsset}
                             onAddDebt={handleAddDebt}
+                            onDeleteAsset={handleDeleteAsset}
+                            onDeleteDebt={handleDeleteDebt}
+                            onDeleteBill={handleDeleteBill}
+                            onDeleteGoal={handleDeleteGoal}
+                            onDeleteRecurring={handleDeleteRecurringPayment}
+                            onDeleteTransactions={handleDeleteTransactions}
                         />;
             default:
                 return <Dashboard

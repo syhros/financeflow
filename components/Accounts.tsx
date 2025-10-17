@@ -87,52 +87,9 @@ const AddEditAccountModal: React.FC<{ isOpen: boolean; onClose: () => void; asse
     const commonInputStyles = "w-full bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-primary outline-none transition-colors";
     const labelStyles = "block text-sm font-medium text-gray-300 mb-2";
 
-    const isInvestingAccount = formData.type === 'Investing';
-
-    const HoldingsView: React.FC<{holdings: Holding[], marketData: MarketData}> = ({ holdings, marketData }) => (
-        <div className="space-y-4">
-             <div>
-                <h3 className="text-lg font-semibold text-white">Holdings</h3>
-                <p className={labelStyles + " mt-0"}>ASSETS</p>
-            </div>
-            <div className="max-h-96 overflow-y-auto pr-2">
-                <table className="w-full text-sm text-left text-gray-400">
-                    <thead className="text-xs text-gray-400 uppercase bg-gray-700">
-                        <tr>
-                            <th scope="col" className="px-4 py-3">Asset</th>
-                            <th scope="col" className="px-4 py-3">Amount</th>
-                            <th scope="col" className="px-4 py-3">Avg. Price</th>
-                            <th scope="col" className="px-4 py-3">P/L</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {holdings.map(holding => {
-                            const currentPrice = marketData[holding.ticker]?.price || 0;
-                            const currentValue = currentPrice * holding.shares;
-                            const avgValue = holding.avgCost * holding.shares;
-                            const pnl = currentValue - avgValue;
-                            const pnlPercent = avgValue > 0 ? (pnl / avgValue) * 100 : 0;
-                            return (
-                                <tr key={holding.ticker} className="border-b border-border-color">
-                                    <td className="px-4 py-3 font-medium text-white">{holding.name} ({holding.ticker})</td>
-                                    <td className="px-4 py-3">{holding.shares}</td>
-                                    <td className="px-4 py-3">{formatCurrency(holding.avgCost)}</td>
-                                    <td className={`px-4 py-3 font-semibold ${pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                        {formatCurrency(pnl)} ({pnlPercent.toFixed(2)}%)
-                                    </td>
-                                </tr>
-                            )
-                        })}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    );
-
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={asset ? 'Edit Asset' : 'Add New Asset'} className={isInvestingAccount ? 'max-w-4xl' : 'max-w-lg'}>
-            <div className={`grid grid-cols-1 ${isInvestingAccount ? 'lg:grid-cols-2 gap-8' : ''}`}>
-                 <div className="space-y-4">
+        <Modal isOpen={isOpen} onClose={onClose} title={asset ? 'Edit Asset' : 'Add New Asset'} className="max-w-lg">
+            <div className="space-y-4">
                     <div>
                         <label htmlFor="name" className={labelStyles}>Account Name</label>
                         <input id="name" placeholder="e.g., Main Checking" value={formData.name || ''} onChange={handleChange} className={commonInputStyles} />
@@ -143,7 +100,7 @@ const AddEditAccountModal: React.FC<{ isOpen: boolean; onClose: () => void; asse
                             <option>Checking</option><option>Savings</option><option>Investing</option>
                         </select>
                     </div>
-                    {!isInvestingAccount && (
+                    {formData.type !== 'Investing' && (
                         <>
                         <div>
                             <label htmlFor="balance" className={labelStyles}>Current Balance</label>
@@ -171,7 +128,6 @@ const AddEditAccountModal: React.FC<{ isOpen: boolean; onClose: () => void; asse
                         <button className="flex-1 py-3 bg-gray-700 text-white rounded-full font-semibold hover:bg-gray-600 transition-colors" onClick={onClose}>Cancel</button>
                         <button onClick={handleSave} className="flex-1 py-3 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-500 transition-colors">{asset ? 'Update Account' : 'Add Account'}</button>
                     </div>
-                </div>
             </div>
         </Modal>
     );
