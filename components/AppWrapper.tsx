@@ -54,7 +54,7 @@ const AppWrapper: React.FC<AppWrapperProps> = ({ children, onUserLoaded }) => {
 
     if (loading || initializing) {
         return (
-            <div className="min-h-screen bg-app-bg flex items-center justify-center">
+            <div className="min-h-screen bg-gray-900 flex items-center justify-center">
                 <div className="text-center">
                     <LoadingSpinner size="large" />
                     <p className="text-gray-400 mt-4">Loading your dashboard...</p>

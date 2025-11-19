@@ -880,7 +880,7 @@ const AppContent: React.FC<{ userId: string }> = ({ userId }) => {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-app-bg flex items-center justify-center">
+            <div className="min-h-screen bg-gray-900 flex items-center justify-center">
                 <div className="text-center">
                     <LoadingSpinner size="large" />
                     <p className="text-gray-400 mt-4">Loading your financial data...</p>
@@ -891,7 +891,7 @@ const AppContent: React.FC<{ userId: string }> = ({ userId }) => {
 
     if (error) {
         return (
-            <div className="min-h-screen bg-app-bg flex items-center justify-center">
+            <div className="min-h-screen bg-gray-900 flex items-center justify-center">
                 <div className="text-center">
                     <p className="text-red-500 text-xl">{error}</p>
                     <button
@@ -910,9 +910,9 @@ const AppContent: React.FC<{ userId: string }> = ({ userId }) => {
             await supabaseService.updateUserSettings(userId, { currency: newCurrency });
             setCurrency(newCurrency);
         }, formatCurrency }}>
-            <div className={`flex min-h-screen bg-base-bg text-gray-200 ${theme}`}>
+            <div className={`flex min-h-screen bg-gray-900 text-gray-200 ${theme}`}>
                 <Sidebar currentPage={currentPage} navigateTo={navigateTo} />
-                <main className="flex-1 p-8 bg-base-bg overflow-y-auto">
+                <main className="flex-1 p-8 bg-gray-900 overflow-y-auto">
                     {renderPage()}
                 </main>
             </div>
