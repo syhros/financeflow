@@ -22,6 +22,7 @@ interface DebtsProps {
     navigateTo: (page: Page) => void;
     theme: 'light' | 'dark';
     onToggleTheme: () => void;
+    onSignOut?: () => void;
 }
 
 const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; }> = ({ isOpen, onClose, title, children }) => {
@@ -278,7 +279,7 @@ const DebtAccountCard: React.FC<{ debt: Debt; onEdit: (acc: Debt) => void; onCli
     );
 };
 
-const Debts: React.FC<DebtsProps> = ({ debts, onAddDebt, onUpdateDebt, onDeleteDebt, onAddTransaction, transactions = [], user, notifications, assets, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
+const Debts: React.FC<DebtsProps> = ({ debts, onAddDebt, onUpdateDebt, onDeleteDebt, onAddTransaction, transactions = [], user, notifications, assets, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme, onSignOut }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingDebt, setEditingDebt] = useState<Debt | undefined>(undefined);
     const [showClosed, setShowClosed] = useState(false);
@@ -354,6 +355,7 @@ const Debts: React.FC<DebtsProps> = ({ debts, onAddDebt, onUpdateDebt, onDeleteD
                         onToggleTheme={onToggleTheme}
                         assets={assets}
                         debts={debts}
+                        onSignOut={onSignOut}
                     />
                 </div>
 

@@ -169,7 +169,8 @@ export const ProfileModal: React.FC<{
     theme: 'light' | 'dark';
     onToggleTheme: () => void;
     onOpenAccountSelection: () => void;
-}> = ({ isOpen, onClose, user, onUpdateUser, navigateTo, theme, onToggleTheme, onOpenAccountSelection }) => {
+    onSignOut?: () => void;
+}> = ({ isOpen, onClose, user, onUpdateUser, navigateTo, theme, onToggleTheme, onOpenAccountSelection, onSignOut }) => {
 
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState(user);
@@ -260,7 +261,7 @@ export const ProfileModal: React.FC<{
                     </div>
                 </div>
                  <div className="p-4">
-                    <button onClick={() => alert('Logged out!')} className="w-full py-3 bg-red-600/20 text-red-400 rounded-lg font-semibold hover:bg-red-600/40 transition-colors">
+                    <button onClick={onSignOut} className="w-full py-3 bg-red-600/20 text-red-400 rounded-lg font-semibold hover:bg-red-600/40 transition-colors">
                         Logout
                     </button>
                 </div>
