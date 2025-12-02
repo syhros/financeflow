@@ -1,4 +1,7 @@
 import React, { useState, useCallback, useEffect, createContext, useContext, useMemo } from 'react';
+import { useAuth } from './contexts/AuthContext';
+import AuthContainer from './components/auth/AuthContainer';
+import LoadingSpinner from './components/shared/LoadingSpinner';
 import { Page, Asset, Debt, Goal, Bill, RecurringPayment, Transaction, Budgets, MarketData, Category, Currency, TransactionRule, User, Notification } from './types';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -59,6 +62,7 @@ function usePersistentState<T>(key: string, initialValue: T): [T, React.Dispatch
 
 
 const App: React.FC = () => {
+    const { user: authUser, loading: authLoading } = useAuth();
     const [currentPage, setCurrentPage] = useState<Page>(Page.Dashboard);
 
     // --- Persistent State Management ---
@@ -610,6 +614,18 @@ const App: React.FC = () => {
                         />;
         }
     };
+
+    if (authLoading) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-slate-900">
+                <LoadingSpinner />
+            </div>
+        );
+    }
+
+    if (!authUser) {
+        return <AuthContainer />;
+    }
 
     return (
         <CurrencyContext.Provider value={{ currency, setCurrency, formatCurrency }}>

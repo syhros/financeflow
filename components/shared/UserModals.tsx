@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Asset, Debt, Page, Notification, NotificationType } from '../../types';
 import { CloseIcon, PencilIcon, SettingsIcon, CalendarDaysIcon, CheckCircleIcon, InformationCircleIcon } from '../icons';
 import { formatDistanceToNow } from 'date-fns';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const AccountSelectionModal: React.FC<{
     isOpen: boolean;
@@ -170,7 +171,7 @@ export const ProfileModal: React.FC<{
     onToggleTheme: () => void;
     onOpenAccountSelection: () => void;
 }> = ({ isOpen, onClose, user, onUpdateUser, navigateTo, theme, onToggleTheme, onOpenAccountSelection }) => {
-
+    const { signOut } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState(user);
 
@@ -260,7 +261,10 @@ export const ProfileModal: React.FC<{
                     </div>
                 </div>
                  <div className="p-4">
-                    <button onClick={() => alert('Logged out!')} className="w-full py-3 bg-red-600/20 text-red-400 rounded-lg font-semibold hover:bg-red-600/40 transition-colors">
+                    <button onClick={async () => {
+                        await signOut();
+                        onClose();
+                    }} className="w-full py-3 bg-red-600/20 text-red-400 rounded-lg font-semibold hover:bg-red-600/40 transition-colors">
                         Logout
                     </button>
                 </div>
