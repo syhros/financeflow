@@ -24,7 +24,6 @@ interface AccountsProps {
     navigateTo: (page: Page) => void;
     theme: 'light' | 'dark';
     onToggleTheme: () => void;
-    onSignOut?: () => void;
 }
 
 const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; className?: string }> = ({ isOpen, onClose, title, children, className }) => {
@@ -163,7 +162,7 @@ const AssetAccountCard: React.FC<{ asset: Asset; onEdit: (acc: Asset) => void; o
     );
 };
 
-const Accounts: React.FC<AccountsProps> = ({ assets, marketData, onAddAsset, onUpdateAsset, onDeleteAsset, onAddTransaction, transactions = [], user, notifications, debts, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme, onSignOut }) => {
+const Accounts: React.FC<AccountsProps> = ({ assets, marketData, onAddAsset, onUpdateAsset, onDeleteAsset, onAddTransaction, transactions = [], user, notifications, debts, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingAsset, setEditingAsset] = useState<Asset | undefined>(undefined);
     const [showClosed, setShowClosed] = useState(false);
@@ -238,7 +237,6 @@ const Accounts: React.FC<AccountsProps> = ({ assets, marketData, onAddAsset, onU
                         onToggleTheme={onToggleTheme}
                         assets={assets}
                         debts={debts}
-                        onSignOut={onSignOut}
                     />
                 </div>
 

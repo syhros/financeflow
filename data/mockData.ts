@@ -138,7 +138,7 @@ export const generateIncomeExpenseData = (transactions: Transaction[], timeFilte
 
 export const generateNetWorthData = (transactions: Transaction[], timeFilter: 'weekly' | 'monthly' | 'yearly' = 'monthly') => {
     const now = new Date();
-    const baseNetWorth = 0;
+    const baseNetWorth = 40000;
 
     if (timeFilter === 'weekly') {
         const weeksData: { name: string, value: number }[] = [];

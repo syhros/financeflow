@@ -14,7 +14,6 @@ interface UserHeaderProps {
     onToggleTheme: () => void;
     assets: any[];
     debts: any[];
-    onSignOut?: () => void;
 }
 
 const UserHeader: React.FC<UserHeaderProps> = ({
@@ -27,8 +26,7 @@ const UserHeader: React.FC<UserHeaderProps> = ({
     theme,
     onToggleTheme,
     assets,
-    debts,
-    onSignOut
+    debts
 }) => {
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [isAccountSelectionOpen, setIsAccountSelectionOpen] = useState(false);
@@ -78,7 +76,6 @@ const UserHeader: React.FC<UserHeaderProps> = ({
                     theme={theme}
                     onToggleTheme={onToggleTheme}
                     onOpenAccountSelection={() => setIsAccountSelectionOpen(true)}
-                    onSignOut={onSignOut}
                 />
                 <AccountSelectionModal
                     isOpen={isAccountSelectionOpen}

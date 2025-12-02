@@ -21,7 +21,6 @@ interface RecurringProps {
     navigateTo: (page: Page) => void;
     theme: 'light' | 'dark';
     onToggleTheme: () => void;
-    onSignOut?: () => void;
 }
 
 const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; }> = ({ isOpen, onClose, title, children }) => {

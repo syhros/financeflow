@@ -25,7 +25,6 @@ interface TransactionsProps {
     navigateTo: (page: Page) => void;
     theme: 'light' | 'dark';
     onToggleTheme: () => void;
-    onSignOut?: () => void;
 }
 
 const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; className?: string; }> = ({ isOpen, onClose, title, children, className }) => {
@@ -274,7 +273,7 @@ const TransactionItem: React.FC<{ tx: Transaction, onEdit: (tx: Transaction) => 
     );
 }
 
-const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts, budgets, categories, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onUpdateBudgets, user, notifications, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme, onSignOut }) => {
+const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts, budgets, categories, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onUpdateBudgets, user, notifications, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
     const [filter, setFilter] = useState<'all' | 'expense' | 'income' | 'investing'>('all');
     const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
     const [chartView, setChartView] = useState<'expense' | 'income'>('expense');
@@ -401,7 +400,6 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts
                     onToggleTheme={onToggleTheme}
                     assets={assets}
                     debts={debts}
-                    onSignOut={onSignOut}
                 />
             </div>
             

@@ -1,12 +1,7 @@
 /* Global Styles */
-@import "tailwindcss";
-
-@theme {
-  --color-primary: #26c45d;
-  --color-card-bg: #1f2937;
-  --color-base-bg: #111827;
-  --color-border-color: #374151;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* Rounded Green Checkboxes with White Tick */
 input[type="checkbox"] {
