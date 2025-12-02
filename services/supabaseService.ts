@@ -12,6 +12,18 @@ export const supabaseService = {
         return data;
     },
 
+    async createUserProfile(userId: string, profile: { email: string; username: string; name: string; avatar_url?: string | null }) {
+        const { error } = await supabase
+            .from('users')
+            .insert({
+                id: userId,
+                ...profile
+            });
+        if (error && error.code !== '23505') {
+            throw error;
+        }
+    },
+
     async updateUserProfile(userId: string, updates: { name?: string; username?: string; avatar_url?: string }) {
         const { error } = await supabase
             .from('users')

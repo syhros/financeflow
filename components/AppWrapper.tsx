@@ -20,10 +20,13 @@ const AppWrapper: React.FC<AppWrapperProps> = ({ children, onUserLoaded }) => {
                     let profile = await supabaseService.getUserProfile(user.id);
 
                     if (!profile) {
-                        await supabaseService.updateUserProfile(user.id, {
-                            name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+                        await supabaseService.createUserProfile(user.id, {
+                            email: user.email || '',
                             username: user.user_metadata?.username || user.email?.split('@')[0] || 'user',
+                            name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+                            avatar_url: user.user_metadata?.avatar_url || null
                         });
+
                         profile = await supabaseService.getUserProfile(user.id);
                     }
 
