@@ -309,3 +309,13 @@ export const generateDebtChartData = (transactions: Transaction[], debts: any[],
 
     return data;
 };
+
+export const generateNetWorthChartData = (transactions: Transaction[], assets: any[], debts: any[], timeFrame: 'day' | 'week' | 'month' | 'year') => {
+    const assetData = generateAssetChartData(transactions, assets, timeFrame);
+    const debtData = generateDebtChartData(transactions, debts, timeFrame);
+
+    return assetData.map((assetPoint, index) => ({
+        name: assetPoint.name,
+        value: Math.round(assetPoint.value - debtData[index].value)
+    }));
+};

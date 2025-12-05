@@ -5,7 +5,7 @@ import { BalanceChart } from './charts';
 import { BellIcon, PlusIcon, iconMap, SettingsIcon, CalendarDaysIcon, CheckCircleIcon, InformationCircleIcon, PencilIcon, CloseIcon } from './icons';
 import { format, addDays, isWithinInterval, formatDistanceToNow } from 'date-fns';
 import { useCurrency } from '../App';
-import { generateAssetChartData, generateDebtChartData } from '../data/mockData';
+import { generateAssetChartData, generateDebtChartData, generateNetWorthChartData } from '../data/mockData';
 
 // Custom hook to detect clicks outside a component
 const useOutsideClick = (ref: React.RefObject<HTMLDivElement>, callback: () => void) => {
@@ -111,13 +111,13 @@ const AccountSelectionModal: React.FC<{
 
                     {mode === 'automatic' ? (
                         <div className="space-y-4">
-                            <p className="text-sm text-gray-400">Automatically display accounts with highest balances. Maximum 6 total accounts.</p>
+                            <p className="text-sm text-gray-400">Automatically display accounts with highest balances. Maximum 7 total accounts.</p>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-300 mb-2">Regular Accounts</label>
                                     <select value={assetCount} onChange={(e) => {
                                         const val = parseInt(e.target.value);
-                                        if (val + debtCount <= 6) setAssetCount(val);
+                                        if (val + debtCount <= 7) setAssetCount(val);
                                     }} className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-primary outline-none">
                                         {[0, 1, 2, 3, 4, 5, 6, 7].map(n => (
                                             <option key={n} value={n} disabled={n + debtCount > 7}>{n}</option>
@@ -128,7 +128,7 @@ const AccountSelectionModal: React.FC<{
                                     <label className="block text-sm font-medium text-gray-300 mb-2">Debt Accounts</label>
                                     <select value={debtCount} onChange={(e) => {
                                         const val = parseInt(e.target.value);
-                                        if (assetCount + val <= 6) setDebtCount(val);
+                                        if (assetCount + val <= 7) setDebtCount(val);
                                     }} className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-primary outline-none">
                                         {[0, 1, 2, 3, 4, 5, 6, 7].map(n => (
                                             <option key={n} value={n} disabled={assetCount + n > 7}>{n}</option>
@@ -429,7 +429,7 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = (props) => {
     const { navigateTo, assets, debts, bills, transactions, user, onUpdateUser, notifications, onMarkAllNotificationsRead, onNotificationClick, isSummaryModalOpen, summaryTransactions, onCloseSummaryModal, theme, onToggleTheme } = props;
-    const [balanceType, setBalanceType] = useState<'assets' | 'debts'>('assets');
+    const [balanceType, setBalanceType] = useState<'assets' | 'debts' | 'networth'>('networth');
     const [timePeriod, setTimePeriod] = useState<'Day' | 'Week' | 'Month' | 'Year'>('Month');
     const [chartTimeFilter, setChartTimeFilter] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -452,9 +452,13 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
         const timeFrameMap = { Day: 'day' as const, Week: 'week' as const, Month: 'month' as const, Year: 'year' as const };
         const timeFrame = timeFrameMap[timePeriod];
 
-        return balanceType === 'assets'
-            ? generateAssetChartData(transactions, assets, timeFrame)
-            : generateDebtChartData(transactions, debts, timeFrame);
+        if (balanceType === 'assets') {
+            return generateAssetChartData(transactions, assets, timeFrame);
+        } else if (balanceType === 'debts') {
+            return generateDebtChartData(transactions, debts, timeFrame);
+        } else {
+            return generateNetWorthChartData(transactions, assets, debts, timeFrame);
+        }
     }
 
     const upcomingBills = bills.filter(bill => {
@@ -522,8 +526,9 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <Card className="flex flex-col justify-center">
                             <p className="text-gray-400">Total balance</p>
-                            <p className="text-4xl font-bold text-white my-2">{formatCurrency(balanceType === 'assets' ? totalAssets : totalDebts)}</p>
+                            <p className="text-4xl font-bold text-white my-2">{formatCurrency(balanceType === 'assets' ? totalAssets : balanceType === 'debts' ? totalDebts : netWorth)}</p>
                             <div className="flex space-x-1 bg-gray-900 p-1 rounded-lg w-min mt-2">
+                                 <button onClick={() => setBalanceType('networth')} className={`px-4 py-1.5 text-sm rounded-md whitespace-nowrap ${balanceType === 'networth' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Net Worth</button>
                                  <button onClick={() => setBalanceType('assets')} className={`px-4 py-1.5 text-sm rounded-md ${balanceType === 'assets' ? 'bg-primary text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Assets</button>
                                  <button onClick={() => setBalanceType('debts')} className={`px-4 py-1.5 text-sm rounded-md ${balanceType === 'debts' ? 'bg-amber-500 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>Debts</button>
                             </div>
@@ -545,7 +550,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                             </div>
                          </div>
                          <div className="h-64">
-                            <BalanceChart data={getChartData()} chartColor={balanceType === 'assets' ? '#26c45d' : '#f59e0b'} />
+                            <BalanceChart data={getChartData()} chartColor={balanceType === 'assets' ? '#26c45d' : balanceType === 'debts' ? '#f59e0b' : '#3b82f6'} />
                          </div>
                     </Card>
                 </div>

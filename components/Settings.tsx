@@ -1346,7 +1346,7 @@ const ImportBackupModal: React.FC<{isOpen: boolean, onClose: () => void, onImpor
             }
 
             // Read and restore each data type
-            const dataTypes = ['assets', 'debts', 'transactions', 'bills', 'goals', 'recurringPayments', 'budgets', 'categories', 'rules', 'settings'];
+            const dataTypes = ['assets', 'debts', 'transactions', 'bills', 'goals', 'recurringPayments', 'budgets', 'categories', 'rules', 'settings', 'user'];
 
             for (const dataType of dataTypes) {
                 const fileName = `${dataType}.json`;
@@ -1359,6 +1359,19 @@ const ImportBackupModal: React.FC<{isOpen: boolean, onClose: () => void, onImpor
                         localStorage.setItem('zenith-notifications-enabled', String(parsed.notificationsEnabled !== false));
                         localStorage.setItem('zenith-auto-categorize', String(parsed.autoCategorize !== false));
                         localStorage.setItem('zenith-smart-suggestions', String(parsed.smartSuggestions !== false));
+                    } else if (dataType === 'user') {
+                        if (!parsed.accountSelection) {
+                            parsed.accountSelection = {
+                                mode: 'automatic',
+                                selectedAssetIds: [],
+                                selectedDebtIds: [],
+                                automaticCounts: {
+                                    assets: 4,
+                                    debts: 3
+                                }
+                            };
+                        }
+                        localStorage.setItem('zenith-user', JSON.stringify(parsed));
                     } else {
                         localStorage.setItem(`zenith-${dataType.replace(/([A-Z])/g, '-$1').toLowerCase()}`, JSON.stringify(parsed));
                     }

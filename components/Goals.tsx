@@ -217,7 +217,10 @@ const GoalCard: React.FC<{ goal: Goal; assets: Asset[]; onEdit: (goal: Goal) => 
     const progress = goal.targetAmount > 0 ? (totalSaved / goal.targetAmount) * 100 : 0;
     const displayProgress = Math.min(progress, 100);
     const monthsLeft = goal.targetDate ? differenceInMonths(new Date(goal.targetDate), new Date()) : 0;
-    
+
+    const remaining = goal.targetAmount - totalSaved;
+    const monthlySavingsNeeded = monthsLeft > 0 ? remaining / monthsLeft : 0;
+
     return (
         <Card className={`relative ${className}`}>
             <div className="flex justify-between items-start mb-3">
@@ -228,7 +231,7 @@ const GoalCard: React.FC<{ goal: Goal; assets: Asset[]; onEdit: (goal: Goal) => 
                  <button onClick={() => onEdit(goal)} className="text-gray-400 hover:text-white"><PencilIcon className="w-4 h-4" /></button>
             </div>
             {goal.linkedAccountIds.length > 0 && <p className="text-xs text-primary mb-2 font-semibold">🔗 Linked to {goal.linkedAccountIds.length} accounts</p>}
-            
+
             <div className="mb-4">
                 <div className="flex justify-between text-xs text-gray-400 mb-1">
                     <span>Progress</span><span>{progress.toFixed(1)}%</span>
@@ -245,6 +248,9 @@ const GoalCard: React.FC<{ goal: Goal; assets: Asset[]; onEdit: (goal: Goal) => 
                     <p className="text-2xl font-bold text-white">{formatCurrency(goal.targetAmount)}</p>
                 </div>
             </div>
+            {monthsLeft > 0 && remaining > 0 && (
+                <p className="text-sm text-gray-400 mb-4">If you save {formatCurrency(monthlySavingsNeeded)} per month you'll reach your goal!</p>
+            )}
             <div className="flex justify-between items-center text-xs text-gray-400 mb-4">
                  <div>
                     {goal.targetDate && <>

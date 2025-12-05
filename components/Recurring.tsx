@@ -350,7 +350,7 @@ const Recurring: React.FC<RecurringProps> = ({ payments, assets, debts, onAddPay
                         {upcomingPayments.length > 0 ? (
                             upcomingPayments.map(p => <PaymentListItem key={p.id} payment={p} assets={assets} debts={debts} onEdit={handleOpenModal} showNextDate={true} />)
                         ) : (
-                            <p className="text-gray-400 py-4 text-center text-sm">No payments due in the next 7 days.</p>
+                            <p className="text-gray-400 py-4 text-left text-sm">No payments due in the next 7 days.</p>
                         )}
                     </div>
                 </Card>
@@ -395,7 +395,7 @@ const Recurring: React.FC<RecurringProps> = ({ payments, assets, debts, onAddPay
                     {sortedPayments.length > 0 ? (
                         sortedPayments.map(p => <PaymentListItem key={p.id} payment={p} assets={assets} debts={debts} onEdit={handleOpenModal} showNextDate={true} />)
                     ) : (
-                        <p className="text-gray-400 py-8 text-center">No recurring payments set up yet.</p>
+                        <p className="text-gray-400 py-8 text-left">No recurring payments set up yet.</p>
                     )}
                 </div>
             </Card>

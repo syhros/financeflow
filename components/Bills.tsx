@@ -116,9 +116,8 @@ const AddEditBillModal: React.FC<{ isOpen: boolean; onClose: () => void; bill?: 
                     </div>
                     <div>
                         <label htmlFor="paymentType" className={labelStyles}>Payment Type</label>
-                        <select id="paymentType" value={formData.paymentType || 'Manual'} onChange={handleChange} className={commonInputStyles}>
+                        <select id="paymentType" value={formData.paymentType || 'Auto-pay'} onChange={handleChange} className={commonInputStyles}>
                             <option>Auto-pay</option>
-                            <option>Manual</option>
                             <option>Reminder</option>
                         </select>
                     </div>
@@ -347,7 +346,11 @@ const Bills: React.FC<BillsProps> = ({ bills, assets, onAddBill, onUpdateBill, o
                         </div>
                     </div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {filteredAndSortedBills.map(bill => <BillListItem key={bill.id} bill={bill} assets={assets} onEdit={handleOpenModal} className={bill.id === highlightedItemId ? 'highlight-animate' : ''} />)}
+                        {filteredAndSortedBills.length > 0 ? (
+                            filteredAndSortedBills.map(bill => <BillListItem key={bill.id} bill={bill} assets={assets} onEdit={handleOpenModal} className={bill.id === highlightedItemId ? 'highlight-animate' : ''} />)
+                        ) : (
+                            <p className="text-gray-400 py-8 text-left">No Bills set up yet.</p>
+                        )}
                     </div>
                 </Card>
 

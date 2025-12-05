@@ -2,13 +2,22 @@ import React, { useMemo, useState } from 'react';
 import Card from './Card';
 import { IncomeExpenseChart, NetWorthChart } from './charts';
 import { dynamicNetWorthData, dynamicIncomeExpenseData, generateIncomeExpenseData, generateNetWorthData } from '../data/mockData';
-import { Asset, Debt, Transaction } from '../types';
+import { Asset, Debt, Transaction, User, Notification, Page } from '../types';
 import { useCurrency } from '../App';
+import UserHeader from './shared/UserHeader';
 
 interface TrendsProps {
     assets: Asset[];
     debts: Debt[];
     transactions: Transaction[];
+    user: User;
+    notifications: Notification[];
+    onUpdateUser: (user: User) => void;
+    onMarkAllNotificationsRead: () => void;
+    onNotificationClick: (notification: Notification) => void;
+    navigateTo: (page: Page) => void;
+    theme: 'light' | 'dark';
+    onToggleTheme: () => void;
 }
 
 interface CategoryData {
@@ -19,7 +28,7 @@ interface CategoryData {
     color: string;
 }
 
-const Trends: React.FC<TrendsProps> = ({ assets, debts, transactions }) => {
+const Trends: React.FC<TrendsProps> = ({ assets, debts, transactions, user, notifications, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
     const [netWorthFilter, setNetWorthFilter] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
     const [incomeExpenseFilter, setIncomeExpenseFilter] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
     const totalAssets = useMemo(() => assets.filter(a => a.status === 'Active').reduce((sum, acc) => sum + acc.balance, 0), [assets]);
@@ -90,7 +99,21 @@ const Trends: React.FC<TrendsProps> = ({ assets, debts, transactions }) => {
 
     return (
         <div className="max-w-7xl mx-auto space-y-8">
-            <h1 className="text-3xl font-bold text-white">Trends</h1>
+            <div className="flex justify-between items-center">
+                <h1 className="text-3xl font-bold text-white">Trends</h1>
+                <UserHeader
+                    user={user}
+                    notifications={notifications}
+                    onUpdateUser={onUpdateUser}
+                    onMarkAllNotificationsRead={onMarkAllNotificationsRead}
+                    onNotificationClick={onNotificationClick}
+                    navigateTo={navigateTo}
+                    theme={theme}
+                    onToggleTheme={onToggleTheme}
+                    assets={assets}
+                    debts={debts}
+                />
+            </div>
 
              <Card>
                 <div className="flex justify-between items-center mb-4">

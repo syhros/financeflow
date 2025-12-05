@@ -231,16 +231,21 @@ const EditBudgetsModal: React.FC<{ isOpen: boolean; onClose: () => void; budgets
 
 const TransactionItem: React.FC<{ tx: Transaction, onEdit: (tx: Transaction) => void, isSelecting?: boolean, isSelected?: boolean, onToggleSelect?: (txId: string) => void }> = ({ tx, onEdit, isSelecting, isSelected, onToggleSelect }) => {
     const { formatCurrency } = useCurrency();
+    const [isClicked, setIsClicked] = React.useState(false);
 
     const handleClick = () => {
         if (isSelecting) {
             onToggleSelect?.(tx.id);
+        } else {
+            setIsClicked(true);
+            setTimeout(() => setIsClicked(false), 200);
+            onEdit(tx);
         }
     };
 
     return (
         <div
-            className={`flex items-center justify-between py-4 ${isSelecting ? 'cursor-pointer hover:bg-gray-700/30 rounded-lg px-2 -mx-2 transition-colors' : ''}`}
+            className={`flex items-center justify-between py-4 cursor-pointer hover:bg-gray-700/30 rounded-lg px-2 -mx-2 transition-all ${isClicked ? 'outline outline-2 outline-primary' : ''}`}
             onClick={handleClick}
         >
             <div className="flex items-center gap-3">
@@ -267,7 +272,6 @@ const TransactionItem: React.FC<{ tx: Transaction, onEdit: (tx: Transaction) => 
                 <p className={`font-bold ${tx.type === 'income' ? 'text-primary' : 'text-white'}`}>
                     {tx.type === 'income' ? '+' : tx.type === 'investing' ? '' : '-'}{formatCurrency(tx.amount).replace(/[+-]/g, '')}
                 </p>
-                {!isSelecting && <button onClick={(e) => { e.stopPropagation(); onEdit(tx); }} className="text-gray-500 hover:text-white"><PencilIcon className="w-4 h-4" /></button>}
             </div>
         </div>
     );
@@ -279,6 +283,7 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts
     const [chartView, setChartView] = useState<'expense' | 'income'>('expense');
     const [isTxModalOpen, setIsTxModalOpen] = useState(false);
     const [editingTx, setEditingTx] = useState<Transaction | undefined>(undefined);
+    const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
     const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [perPage, setPerPage] = useState(() => {
@@ -338,16 +343,31 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts
     };
 
     const { totalExpenses, totalIncome } = useMemo(() => {
-        const now = new Date();
         const thisMonthTxs = transactions.filter(tx => {
             const txDate = new Date(tx.date);
-            return txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear();
+            return txDate.getMonth() === selectedMonth.getMonth() && txDate.getFullYear() === selectedMonth.getFullYear();
         });
         return {
             totalExpenses: thisMonthTxs.filter(t => t.type === 'expense').reduce((sum, tx) => sum + tx.amount, 0),
             totalIncome: thisMonthTxs.filter(t => t.type === 'income').reduce((sum, tx) => sum + tx.amount, 0),
         }
-    }, [transactions]);
+    }, [transactions, selectedMonth]);
+
+    const goToPreviousMonth = () => {
+        setSelectedMonth(prev => {
+            const newDate = new Date(prev);
+            newDate.setMonth(prev.getMonth() - 1);
+            return newDate;
+        });
+    };
+
+    const goToNextMonth = () => {
+        setSelectedMonth(prev => {
+            const newDate = new Date(prev);
+            newDate.setMonth(prev.getMonth() + 1);
+            return newDate;
+        });
+    };
 
 
     const filteredTransactions = transactions.filter(tx => {
@@ -425,14 +445,20 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts
                                         <option value="amount-desc">Amount (High to Low)</option>
                                         <option value="amount-asc">Amount (Low to High)</option>
                                     </select>
-                                    <button onClick={() => handleOpenTxModal()} className="flex items-center bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">
-                                        <PlusIcon className="h-5 w-5 mr-2" />
-                                        Add New
-                                    </button>
+                                    {!isSelecting && (
+                                        <button onClick={() => handleOpenTxModal()} className="flex items-center bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">
+                                            <PlusIcon className="h-5 w-5 mr-2" />
+                                            Add New
+                                        </button>
+                                    )}
                                 </div>
                                 <div className="flex gap-2">
                                     {isSelecting ? (
                                         <>
+                                            <button onClick={() => {
+                                                const allCurrentPageIds = paginatedTransactions.map(tx => tx.id);
+                                                setSelectedTxIds(allCurrentPageIds);
+                                            }} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">All</button>
                                             {selectedTxIds.length > 0 && (
                                                 <button onClick={() => setShowBulkDeleteConfirm(true)} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors">Delete All ({selectedTxIds.length})</button>
                                             )}
@@ -506,6 +532,23 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts
                         ) : (
                              <BudgetDoughnut value={totalIncome} total={budgets.income} label="Total Income" color="#3b82f6" />
                         )}
+                        <div className="flex items-center justify-center gap-3 mt-6 pt-4 border-t border-border-color">
+                            <button onClick={goToPreviousMonth} className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors">
+                                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
+                            <span className="text-white font-semibold min-w-[80px] text-center">
+                                {selectedMonth.getFullYear() === new Date().getFullYear()
+                                    ? format(selectedMonth, 'MMM')
+                                    : format(selectedMonth, 'MMM yy')}
+                            </span>
+                            <button onClick={goToNextMonth} className="p-2 hover:bg-gray-700/50 rounded-lg transition-colors">
+                                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        </div>
                     </Card>
                     <Card>
                         <div className="flex justify-between items-center mb-4">

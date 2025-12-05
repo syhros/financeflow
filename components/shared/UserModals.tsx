@@ -93,13 +93,13 @@ export const AccountSelectionModal: React.FC<{
 
                     {mode === 'automatic' ? (
                         <div className="space-y-4">
-                            <p className="text-sm text-gray-400">Automatically display accounts with highest balances. Maximum 6 total accounts.</p>
+                            <p className="text-sm text-gray-400">Automatically display accounts with highest balances. Maximum 7 total accounts.</p>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-300 mb-2">Regular Accounts</label>
                                     <select value={assetCount} onChange={(e) => {
                                         const val = parseInt(e.target.value);
-                                        if (val + debtCount <= 6) setAssetCount(val);
+                                        if (val + debtCount <= 7) setAssetCount(val);
                                     }} className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-primary outline-none">
                                         {[0, 1, 2, 3, 4, 5, 6, 7].map(n => (
                                             <option key={n} value={n} disabled={n + debtCount > 7}>{n}</option>
@@ -110,7 +110,7 @@ export const AccountSelectionModal: React.FC<{
                                     <label className="block text-sm font-medium text-gray-300 mb-2">Debt Accounts</label>
                                     <select value={debtCount} onChange={(e) => {
                                         const val = parseInt(e.target.value);
-                                        if (assetCount + val <= 6) setDebtCount(val);
+                                        if (assetCount + val <= 7) setDebtCount(val);
                                     }} className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-primary outline-none">
                                         {[0, 1, 2, 3, 4, 5, 6, 7].map(n => (
                                             <option key={n} value={n} disabled={assetCount + n > 7}>{n}</option>
@@ -174,6 +174,7 @@ export const ProfileModal: React.FC<{
     const { signOut } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState(user);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (isOpen) {
@@ -200,6 +201,17 @@ export const ProfileModal: React.FC<{
         setIsEditing(false);
     };
 
+    const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setFormData({...formData, avatarUrl: reader.result as string});
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     if (!isOpen) return null;
 
     const commonInputStyles = "w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:border-primary outline-none transition-colors";
@@ -215,16 +227,26 @@ export const ProfileModal: React.FC<{
                     <div className="relative group">
                         <img src={formData.avatarUrl} alt="Profile" className="w-24 h-24 rounded-full border-4 border-primary"/>
                         {isEditing && (
-                             <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                             <button
+                                onClick={() => fileInputRef.current?.click()}
+                                className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                             >
                                 <PencilIcon className="w-6 h-6 text-white" />
-                            </div>
+                            </button>
                         )}
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            className="hidden"
+                        />
                     </div>
                     {isEditing ? (
                         <div className="w-full mt-4 space-y-3">
                             <div><label htmlFor="name" className={labelStyles}>Full Name</label><input type="text" id="name" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className={commonInputStyles} /></div>
                             <div><label htmlFor="username" className={labelStyles}>Username</label><input type="text" id="username" value={formData.username} onChange={(e) => setFormData({...formData, username: e.target.value})} className={commonInputStyles} /></div>
-                             <div><label htmlFor="avatarUrl" className={labelStyles}>Avatar URL</label><input type="text" id="avatarUrl" value={formData.avatarUrl} onChange={(e) => setFormData({...formData, avatarUrl: e.target.value})} className={commonInputStyles} /></div>
+                             <div><label htmlFor="avatarUrl" className={labelStyles}>Avatar URL</label><input type="text" id="avatarUrl" value={formData.avatarUrl} onChange={(e) => setFormData({...formData, avatarUrl: e.target.value})} className={commonInputStyles} placeholder="Or upload an image above" /></div>
                         </div>
                     ) : (
                         <>
