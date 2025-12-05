@@ -55,13 +55,13 @@ export interface Transaction {
     category: string;
     date: string; // ISO String
     amount: number;
-    type: 'income' | 'expense' | 'investing';
-    accountId: string; // The primary account (e.g., the investing account)
+    type: 'income' | 'expense' | 'investing' | 'debtpayment';
+    accountId: string; // The primary account (e.g., the investing account or debt account)
     // For investing transactions
     ticker?: string;
     shares?: number;
     purchasePrice?: number;
-    sourceAccountId?: string; // The cash account used for the purchase
+    sourceAccountId?: string; // The cash account used for purchases or debt payments
 }
 
 export interface TransactionRule {

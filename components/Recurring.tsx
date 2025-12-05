@@ -181,7 +181,7 @@ const PaymentListItem: React.FC<{ payment: RecurringPayment; assets: Asset[]; de
     const nextPaymentDate = calculateNextPaymentDate(payment);
 
     return (
-        <div className="flex items-center justify-between py-4">
+        <div className="flex items-center justify-between py-4 rounded-lg px-4">
             <div className="flex items-center">
                  <div className="w-10 h-10 rounded-lg flex items-center justify-center mr-4 bg-gray-700">
                     <RefreshIcon className={`w-6 h-6 ${typeColor}`} />
@@ -193,7 +193,7 @@ const PaymentListItem: React.FC<{ payment: RecurringPayment; assets: Asset[]; de
                             ? `${fromAccount?.name} to ${toAccount?.name}`
                             : fromAccount?.name} • {payment.frequency}
                     </p>
-                     {showNextDate && <p className="text-xs text-gray-500 font-semibold mt-0.5">Next: {format(nextPaymentDate, 'MMM dd, yyyy')}</p>}
+                     {showNextDate && <p className="text-xs text-primary font-semibold mt-0.5">Next: {format(nextPaymentDate, 'MMM dd, yyyy')}</p>}
                 </div>
             </div>
             <div className="flex items-center gap-4">
@@ -201,7 +201,7 @@ const PaymentListItem: React.FC<{ payment: RecurringPayment; assets: Asset[]; de
                     <p className={`font-bold text-white text-sm ${payment.type === 'Income' ? 'text-primary' : ''}`}>{payment.type === 'Income' ? '+' : '-'}{formatCurrency(payment.amount).replace(/[+-]/g, '')}</p>
                      <p className={`text-xs font-semibold ${typeColor}`}>{payment.type}</p>
                 </div>
-                <button onClick={() => onEdit(payment)} className="p-2 text-gray-500 hover:text-white hover:bg-green-600 rounded-lg transition-colors"><PencilIcon className="w-4 h-4" /></button>
+                <button onClick={() => onEdit(payment)} className="text-gray-500 hover:text-white"><PencilIcon className="w-4 h-4" /></button>
             </div>
         </div>
     )
@@ -212,6 +212,8 @@ const Recurring: React.FC<RecurringProps> = ({ payments, assets, debts, onAddPay
     const [selectedPayment, setSelectedPayment] = useState<RecurringPayment | undefined>(undefined);
     const [sort, setSort] = useState('date-asc');
     const [typeFilter, setTypeFilter] = useState('All');
+    const [frequencyFilter, setFrequencyFilter] = useState('All');
+    const [accountFilter, setAccountFilter] = useState('All');
     const { formatCurrency } = useCurrency();
 
     const handleOpenModal = (payment?: RecurringPayment) => {
@@ -297,6 +299,16 @@ const Recurring: React.FC<RecurringProps> = ({ payments, assets, debts, onAddPay
             filtered = filtered.filter(p => p.type === typeFilter);
         }
 
+        // Filter by frequency
+        if (frequencyFilter !== 'All') {
+            filtered = filtered.filter(p => p.frequency === frequencyFilter);
+        }
+
+        // Filter by account
+        if (accountFilter !== 'All') {
+            filtered = filtered.filter(p => p.fromAccountId === accountFilter);
+        }
+
         // Sort
         filtered.sort((a, b) => {
             switch (sort) {
@@ -316,10 +328,12 @@ const Recurring: React.FC<RecurringProps> = ({ payments, assets, debts, onAddPay
         });
 
         return filtered;
-    }, [nonExpensePayments, sort, typeFilter]);
+    }, [nonExpensePayments, sort, typeFilter, frequencyFilter, accountFilter]);
 
-    const uniqueTypes = ['All', ...Array.from(new Set(nonExpensePayments.map(p => p.type)))];
-    const commonSelectStyles = "bg-gray-700 text-white rounded-lg px-3 py-2 text-sm border border-gray-600 focus:border-primary outline-none";
+    const uniqueTypes = useMemo(() => ['All', ...Array.from(new Set(nonExpensePayments.map(p => p.type)))], [nonExpensePayments]);
+    const uniqueFrequencies = useMemo(() => ['All', ...Array.from(new Set(nonExpensePayments.map(p => p.frequency)))], [nonExpensePayments]);
+    const uniqueAccountIds = useMemo(() => ['All', ...Array.from(new Set(nonExpensePayments.map(p => p.fromAccountId).filter(Boolean)))], [nonExpensePayments]);
+    const commonSelectStyles = "bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-primary focus:border-primary block w-full p-2.5";
 
     return (
         <>
@@ -345,7 +359,7 @@ const Recurring: React.FC<RecurringProps> = ({ payments, assets, debts, onAddPay
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Upcoming Payments */}
                 <Card className="md:col-span-2">
-                    <h2 className="text-lg font-bold text-white mb-4">Upcoming Payments (Next 7 Days)</h2>
+                    <h2 className="text-lg font-bold text-white mb-2">Upcoming Payments (Next 7 Days)</h2>
                     <div className="divide-y divide-border-color">
                         {upcomingPayments.length > 0 ? (
                             upcomingPayments.map(p => <PaymentListItem key={p.id} payment={p} assets={assets} debts={debts} onEdit={handleOpenModal} showNextDate={true} />)
@@ -384,6 +398,17 @@ const Recurring: React.FC<RecurringProps> = ({ payments, assets, debts, onAddPay
                         </select>
                          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className={commonSelectStyles}>
                              {uniqueTypes.map(type => <option key={type} value={type}>{type === 'All' ? 'All Types' : type}</option>)}
+                        </select>
+                        <select value={frequencyFilter} onChange={e => setFrequencyFilter(e.target.value)} className={commonSelectStyles}>
+                             {uniqueFrequencies.map(freq => <option key={freq} value={freq}>{freq === 'All' ? 'All Frequency' : freq}</option>)}
+                        </select>
+                        <select value={accountFilter} onChange={e => setAccountFilter(e.target.value)} className={commonSelectStyles}>
+                           <option value="All">All Accounts</option>
+                           {uniqueAccountIds.map(id => {
+                               const account = assets.find(a => a.id === id) || debts.find(d => d.id === id);
+                               if(!account) return null;
+                               return <option key={id} value={id}>{account.name}</option>
+                           })}
                         </select>
                         <button onClick={() => handleOpenModal()} className="flex items-center bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity whitespace-nowrap">
                             <PlusIcon className="h-5 w-5 mr-2" />

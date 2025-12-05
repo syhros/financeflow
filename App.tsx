@@ -212,6 +212,30 @@ const App: React.FC = () => {
             return;
         }
 
+        if (transaction.type === 'debtpayment') {
+            const newTx = { ...transaction, id: new Date().toISOString() };
+            setTransactions(prev => [newTx, ...prev]);
+
+            // Decrease source account balance (payment leaving account)
+            if (transaction.sourceAccountId) {
+                setAssets(prevAssets => prevAssets.map(asset => {
+                    if (asset.id === transaction.sourceAccountId) {
+                        return { ...asset, balance: asset.balance - transaction.amount };
+                    }
+                    return asset;
+                }));
+            }
+
+            // Decrease debt balance (paying down debt)
+            setDebts(prevDebts => prevDebts.map(debt => {
+                if (debt.id === transaction.accountId) {
+                    return { ...debt, balance: debt.balance - transaction.amount };
+                }
+                return debt;
+            }));
+            return;
+        }
+
         let finalTxData = { ...transaction };
 
         if (autoCategorize) {
@@ -223,7 +247,7 @@ const App: React.FC = () => {
                 }
             }
         }
-        
+
         const newTx = { ...finalTxData, id: new Date().toISOString() };
         setTransactions(prev => [newTx, ...prev]);
 
@@ -249,7 +273,50 @@ const App: React.FC = () => {
         // Find the old transaction to calculate balance adjustment
         const oldTransaction = transactions.find(t => t.id === updatedTransaction.id);
 
-        if (oldTransaction && (oldTransaction.amount !== updatedTransaction.amount || oldTransaction.type !== updatedTransaction.type || oldTransaction.accountId !== updatedTransaction.accountId)) {
+        if (oldTransaction && (oldTransaction.amount !== updatedTransaction.amount || oldTransaction.type !== updatedTransaction.type || oldTransaction.accountId !== updatedTransaction.accountId || oldTransaction.sourceAccountId !== updatedTransaction.sourceAccountId)) {
+
+            // Handle debt payment transactions specially
+            if (oldTransaction.type === 'debtpayment' || updatedTransaction.type === 'debtpayment') {
+                // Reverse old debt payment
+                if (oldTransaction.type === 'debtpayment') {
+                    if (oldTransaction.sourceAccountId) {
+                        setAssets(prevAssets => prevAssets.map(asset => {
+                            if (asset.id === oldTransaction.sourceAccountId) {
+                                return { ...asset, balance: asset.balance + oldTransaction.amount };
+                            }
+                            return asset;
+                        }));
+                    }
+                    setDebts(prevDebts => prevDebts.map(debt => {
+                        if (debt.id === oldTransaction.accountId) {
+                            return { ...debt, balance: debt.balance + oldTransaction.amount };
+                        }
+                        return debt;
+                    }));
+                }
+
+                // Apply new debt payment
+                if (updatedTransaction.type === 'debtpayment') {
+                    if (updatedTransaction.sourceAccountId) {
+                        setAssets(prevAssets => prevAssets.map(asset => {
+                            if (asset.id === updatedTransaction.sourceAccountId) {
+                                return { ...asset, balance: asset.balance - updatedTransaction.amount };
+                            }
+                            return asset;
+                        }));
+                    }
+                    setDebts(prevDebts => prevDebts.map(debt => {
+                        if (debt.id === updatedTransaction.accountId) {
+                            return { ...debt, balance: debt.balance - updatedTransaction.amount };
+                        }
+                        return debt;
+                    }));
+                }
+
+                setTransactions(prev => prev.map(t => t.id === updatedTransaction.id ? updatedTransaction : t));
+                return;
+            }
+
             const accountChanged = oldTransaction.accountId !== updatedTransaction.accountId;
 
             // Update assets
@@ -329,6 +396,28 @@ const App: React.FC = () => {
     const handleDeleteTransaction = (transactionId: string) => {
         const transaction = transactions.find(t => t.id === transactionId);
         if (!transaction) return;
+
+        // Handle debt payment deletions
+        if (transaction.type === 'debtpayment') {
+            // Reverse the payment from source account (add money back)
+            if (transaction.sourceAccountId) {
+                setAssets(prevAssets => prevAssets.map(asset => {
+                    if (asset.id === transaction.sourceAccountId) {
+                        return { ...asset, balance: asset.balance + transaction.amount };
+                    }
+                    return asset;
+                }));
+            }
+            // Reverse the payment to debt (increase debt back)
+            setDebts(prevDebts => prevDebts.map(debt => {
+                if (debt.id === transaction.accountId) {
+                    return { ...debt, balance: debt.balance + transaction.amount };
+                }
+                return debt;
+            }));
+            setTransactions(prev => prev.filter(t => t.id !== transactionId));
+            return;
+        }
 
         // Reverse the transaction's effect on account/debt balances
         setAssets(prevAssets => prevAssets.map(asset => {

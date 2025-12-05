@@ -30,7 +30,7 @@ interface TransactionsProps {
 const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode; className?: string; }> = ({ isOpen, onClose, title, children, className }) => {
     if (!isOpen) return null;
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" onClick={onClose}>
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-[60] flex justify-center items-center p-4" onClick={onClose}>
             <div className={`bg-card-bg rounded-lg shadow-xl w-full border border-border-color overflow-hidden ${className || 'max-w-lg'}`} onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-center p-4 border-b border-border-color">
                     <h2 className="text-xl font-bold text-white">{title}</h2>
@@ -113,6 +113,7 @@ const AddEditTransactionModal: React.FC<{ isOpen: boolean; onClose: () => void; 
                         <option value="expense">Expense</option>
                         <option value="income">Income</option>
                         <option value="investing">Investing</option>
+                        <option value="debtpayment">Debt Payment</option>
                     </select>
                 </div>
                 
@@ -138,6 +139,28 @@ const AddEditTransactionModal: React.FC<{ isOpen: boolean; onClose: () => void; 
                             </select>
                         </div>
                         <div><label htmlFor="category" className={labelStyles}>Asset Type</label><select id="category" value={formData.category || 'Stock'} onChange={handleChange} className={commonInputStyles}><option>Stock</option><option>Crypto</option></select></div>
+                    </>
+                ) : formData.type === 'debtpayment' ? (
+                    <>
+                        <div><label htmlFor="merchant" className={labelStyles}>Description</label><input type="text" id="merchant" value={formData.merchant || ''} onChange={handleChange} className={commonInputStyles} placeholder="e.g., Credit Card Payment" /></div>
+                        <div>
+                            <label htmlFor="amount" className={labelStyles}>Payment Amount</label>
+                            <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">{currencySymbol}</span><input type="number" id="amount" value={formData.amount || 0} onChange={e => setFormData({...formData, amount: parseFloat(e.target.value)})} className={`${commonInputStyles} pl-7`} /></div>
+                        </div>
+                        <div>
+                            <label htmlFor="sourceAccountId" className={labelStyles}>Paid From</label>
+                            <select id="sourceAccountId" value={formData.sourceAccountId || ''} onChange={handleChange} className={commonInputStyles}>
+                                <option value="">Select Account</option>
+                                {cashAccounts.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label htmlFor="accountId" className={labelStyles}>Debt Account</label>
+                            <select id="accountId" value={formData.accountId || ''} onChange={handleChange} className={commonInputStyles}>
+                                <option value="">Select Debt Account</option>
+                                {debts.filter(d => d.status === 'Active').map(debt => <option key={debt.id} value={debt.id}>{debt.name}</option>)}
+                            </select>
+                        </div>
                     </>
                 ) : (
                     <>
@@ -269,7 +292,7 @@ const TransactionItem: React.FC<{ tx: Transaction, onEdit: (tx: Transaction) => 
                 </div>
             </div>
             <div className="flex items-center gap-4">
-                <p className={`font-bold ${tx.type === 'income' ? 'text-primary' : 'text-white'}`}>
+                <p className={`font-bold ${tx.type === 'income' ? 'text-primary' : tx.type === 'debtpayment' ? 'text-yellow-400' : 'text-white'}`}>
                     {tx.type === 'income' ? '+' : tx.type === 'investing' ? '' : '-'}{formatCurrency(tx.amount).replace(/[+-]/g, '')}
                 </p>
             </div>
@@ -278,7 +301,7 @@ const TransactionItem: React.FC<{ tx: Transaction, onEdit: (tx: Transaction) => 
 }
 
 const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts, budgets, categories, onAddTransaction, onUpdateTransaction, onDeleteTransaction, onUpdateBudgets, user, notifications, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
-    const [filter, setFilter] = useState<'all' | 'expense' | 'income' | 'investing'>('all');
+    const [filter, setFilter] = useState<'all' | 'expense' | 'income' | 'investing' | 'debtpayment'>('all');
     const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
     const [chartView, setChartView] = useState<'expense' | 'income'>('expense');
     const [isTxModalOpen, setIsTxModalOpen] = useState(false);
@@ -430,15 +453,16 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts
                             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
                                 <div className="flex flex-wrap gap-3">
                                     <div className="flex space-x-1 bg-gray-900 p-1 rounded-lg">
-                                        <button onClick={() => setFilter('all')} className={`px-4 py-2 text-sm rounded-md ${filter === 'all' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>All</button>
-                                        <button onClick={() => setFilter('expense')} className={`px-4 py-2 text-sm rounded-md ${filter === 'expense' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Expenses</button>
-                                        <button onClick={() => setFilter('income')} className={`px-4 py-2 text-sm rounded-md ${filter === 'income' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Income</button>
-                                        <button onClick={() => setFilter('investing')} className={`px-4 py-2 text-sm rounded-md ${filter === 'investing' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Investing</button>
+                                        <button onClick={() => setFilter('all')} className={`px-3 py-1.5 text-sm rounded-md ${filter === 'all' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>All</button>
+                                        <button onClick={() => setFilter('expense')} className={`px-3 py-1.5 text-sm rounded-md ${filter === 'expense' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Expenses</button>
+                                        <button onClick={() => setFilter('income')} className={`px-3 py-1.5 text-sm rounded-md ${filter === 'income' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Income</button>
+                                        <button onClick={() => setFilter('investing')} className={`px-3 py-1.5 text-sm rounded-md ${filter === 'investing' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Investing</button>
+                                        <button onClick={() => setFilter('debtpayment')} className={`px-3 py-1.5 text-sm rounded-md ${filter === 'debtpayment' ? 'bg-primary text-white' : 'text-gray-300 hover:bg-gray-700'}`}>Debt</button>
                                     </div>
                                     <select
                                         value={sortBy}
                                         onChange={(e) => setSortBy(e.target.value as any)}
-                                        className="bg-gray-900 text-white px-4 py-2 text-sm rounded-lg border border-gray-700 focus:border-primary outline-none"
+                                        className="bg-gray-900 text-white px-3 py-1.5 text-sm rounded-lg border border-gray-700 focus:border-primary outline-none"
                                     >
                                         <option value="date-desc">Date (Newest First)</option>
                                         <option value="date-asc">Date (Oldest First)</option>
@@ -446,8 +470,8 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts
                                         <option value="amount-asc">Amount (Low to High)</option>
                                     </select>
                                     {!isSelecting && (
-                                        <button onClick={() => handleOpenTxModal()} className="flex items-center bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">
-                                            <PlusIcon className="h-5 w-5 mr-2" />
+                                        <button onClick={() => handleOpenTxModal()} className="flex items-center bg-primary text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">
+                                            <PlusIcon className="h-4 w-4 mr-1.5" />
                                             Add New
                                         </button>
                                     )}
@@ -458,14 +482,14 @@ const Transactions: React.FC<TransactionsProps> = ({ transactions, assets, debts
                                             <button onClick={() => {
                                                 const allCurrentPageIds = paginatedTransactions.map(tx => tx.id);
                                                 setSelectedTxIds(allCurrentPageIds);
-                                            }} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">All</button>
+                                            }} className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors">All</button>
                                             {selectedTxIds.length > 0 && (
-                                                <button onClick={() => setShowBulkDeleteConfirm(true)} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors">Delete All ({selectedTxIds.length})</button>
+                                                <button onClick={() => setShowBulkDeleteConfirm(true)} className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors">Delete All ({selectedTxIds.length})</button>
                                             )}
-                                            <button onClick={handleCancelSelect} className="px-4 py-2 text-sm bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-600 transition-colors">Cancel</button>
+                                            <button onClick={handleCancelSelect} className="px-3 py-1.5 text-sm bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-600 transition-colors">Cancel</button>
                                         </>
                                     ) : (
-                                        <button onClick={() => setIsSelecting(true)} className="px-4 py-2 text-sm bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-600 transition-colors">Select</button>
+                                        <button onClick={() => setIsSelecting(true)} className="px-3 py-1.5 text-sm bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-600 transition-colors">Select</button>
                                     )}
                                 </div>
                             </div>

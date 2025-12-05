@@ -3,6 +3,7 @@ import { User, Asset, Debt, Page, Notification, NotificationType } from '../../t
 import { CloseIcon, PencilIcon, SettingsIcon, CalendarDaysIcon, CheckCircleIcon, InformationCircleIcon } from '../icons';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
+import { ImageCropModal } from './ImageCropModal';
 
 export const AccountSelectionModal: React.FC<{
     isOpen: boolean;
@@ -174,6 +175,8 @@ export const ProfileModal: React.FC<{
     const { signOut } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState(user);
+    const [tempImageUrl, setTempImageUrl] = useState<string>('');
+    const [showCropModal, setShowCropModal] = useState(false);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -206,10 +209,15 @@ export const ProfileModal: React.FC<{
         if (file) {
             const reader = new FileReader();
             reader.onloadend = () => {
-                setFormData({...formData, avatarUrl: reader.result as string});
+                setTempImageUrl(reader.result as string);
+                setShowCropModal(true);
             };
             reader.readAsDataURL(file);
         }
+    };
+
+    const handleCropComplete = (croppedImage: string) => {
+        setFormData({...formData, avatarUrl: croppedImage});
     };
 
     if (!isOpen) return null;
@@ -291,6 +299,12 @@ export const ProfileModal: React.FC<{
                     </button>
                 </div>
             </div>
+            <ImageCropModal
+                isOpen={showCropModal}
+                onClose={() => setShowCropModal(false)}
+                imageUrl={tempImageUrl}
+                onCropComplete={handleCropComplete}
+            />
         </div>
     )
 }
