@@ -48,7 +48,13 @@ export const getTickerToLondonFlagMap = (assets: Asset[]): Record<string, boolea
     return tickerMap;
 };
 
-export const getMarketPriceForTicker = (ticker: string, isLondonListed: boolean, marketData: MarketData): number | undefined => {
+export const getMarketPriceForTicker = (ticker: string, isLondonListed: boolean, isPennyStock: boolean, marketData: MarketData): number | undefined => {
     const apiTicker = isLondonListed ? `${ticker}.L` : ticker;
-    return marketData[apiTicker]?.price || marketData[ticker]?.price;
+    let price = marketData[apiTicker]?.price || marketData[ticker]?.price;
+
+    if (price && isPennyStock) {
+        price = price / 100;
+    }
+
+    return price;
 };

@@ -27,6 +27,7 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
     const [editingHoldingTicker, setEditingHoldingTicker] = useState<string | null>(null);
     const [holdingIconUrl, setHoldingIconUrl] = useState('');
     const [editingLondonListed, setEditingLondonListed] = useState(false);
+    const [editingPennyStock, setEditingPennyStock] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -49,18 +50,20 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
         setEditingHoldingTicker(ticker);
         setHoldingIconUrl('');
         setEditingLondonListed(holding?.isLondonListed || false);
+        setEditingPennyStock(holding?.isPennyStock || false);
         setSaveMessage(null);
     };
 
     const handleSave = async () => {
         if (!editingHoldingTicker || !onUpdateHolding) return;
 
-        const updates: { icon?: string; isLondonListed?: boolean } = {};
+        const updates: { icon?: string; isLondonListed?: boolean; isPennyStock?: boolean } = {};
         const holding = (account as Asset).holdings?.find(h => h.ticker === editingHoldingTicker);
         if (!holding) return;
 
         if (holdingIconUrl) updates.icon = holdingIconUrl;
         updates.isLondonListed = editingLondonListed;
+        updates.isPennyStock = editingPennyStock;
 
         setIsSaving(true);
         try {
@@ -103,7 +106,7 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
             account.holdings.forEach(holding => {
                 const holdingMetrics = calculateHoldingMetrics(
                     holding,
-                    getMarketPriceForTicker(holding.ticker, holding.isLondonListed || false, marketData),
+                    getMarketPriceForTicker(holding.ticker, holding.isLondonListed || false, holding.isPennyStock || false, marketData),
                     holding.ticker,
                     accountTransactions
                 );
@@ -131,8 +134,8 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
         return asset.holdings
             .filter(h => h.shares > 0.1)
             .sort((a, b) => {
-                const aValue = (getMarketPriceForTicker(a.ticker, a.isLondonListed || false, marketData) || a.currentPrice || a.avgCost) * a.shares;
-                const bValue = (getMarketPriceForTicker(b.ticker, b.isLondonListed || false, marketData) || b.currentPrice || b.avgCost) * b.shares;
+                const aValue = (getMarketPriceForTicker(a.ticker, a.isLondonListed || false, a.isPennyStock || false, marketData) || a.currentPrice || a.avgCost) * a.shares;
+                const bValue = (getMarketPriceForTicker(b.ticker, b.isLondonListed || false, b.isPennyStock || false, marketData) || b.currentPrice || b.avgCost) * b.shares;
                 return bValue - aValue;
             });
     }, [asset.holdings, marketData]);
@@ -185,7 +188,7 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                     </div>
                 )}
 
-                <div className={`grid grid-cols-1 lg:grid-cols-3 gap-6 p-6 ${perPage > 10 ? 'overflow-y-auto max-h-[calc(90vh-180px)]' : ''}`}>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
                     <div className="lg:col-span-2">
                         {isInvestingAccount && activeTab === 'assets' ? (
                             <div>
@@ -197,7 +200,7 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                 {paginatedActiveHoldings.length > 0 ? (
                                     <div className="space-y-3 max-h-[calc(90vh-400px)] overflow-y-auto pr-2">
                                         {paginatedActiveHoldings.map(holding => {
-                                            const marketPrice = getMarketPriceForTicker(holding.ticker, holding.isLondonListed || false, marketData);
+                                            const marketPrice = getMarketPriceForTicker(holding.ticker, holding.isLondonListed || false, holding.isPennyStock || false, marketData);
                                             const holdingMetrics = calculateHoldingMetrics(
                                               holding,
                                               marketPrice,
@@ -320,7 +323,7 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                         {showZeroHoldings && (
                                             <div className="mt-3 space-y-2">
                                                 {zeroHoldings.map(holding => {
-                                                    const marketPrice = getMarketPriceForTicker(holding.ticker, holding.isLondonListed || false, marketData);
+                                                    const marketPrice = getMarketPriceForTicker(holding.ticker, holding.isLondonListed || false, holding.isPennyStock || false, marketData);
                                                     const holdingMetrics = calculateHoldingMetrics(
                                                       holding,
                                                       marketPrice,
@@ -494,6 +497,21 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                     <div>
                                         <p className="text-white font-medium">London Stock Exchange (.L)</p>
                                         <p className="text-xs text-gray-400">Append .L suffix when fetching market data (e.g. VUSA.L)</p>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div>
+                                <label className="flex items-center gap-3 cursor-pointer p-3 bg-gray-700/50 rounded-lg border border-gray-600 hover:border-gray-500 transition-colors">
+                                    <input
+                                        type="checkbox"
+                                        checked={editingPennyStock}
+                                        onChange={(e) => setEditingPennyStock(e.target.checked)}
+                                        className="w-5 h-5 rounded border-gray-500 text-blue-500 focus:ring-blue-500"
+                                    />
+                                    <div>
+                                        <p className="text-white font-medium">Penny Stock</p>
+                                        <p className="text-xs text-gray-400">Stock traded in pence (e.g. Shell RDBS.L, Evraz EVR.L). Prices divided by 100 for GBP conversion.</p>
                                     </div>
                                 </label>
                             </div>
