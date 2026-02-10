@@ -1515,7 +1515,7 @@ const ToggleSwitch: React.FC<{ enabled: boolean; onToggle: () => void }> = ({ en
 );
 
 const Settings: React.FC<SettingsProps> = (props) => {
-    const { categories, onAddCategory, onUpdateCategory, onDeleteCategory, rules, onAddRule, onDeleteRule, onWipeData, notificationsEnabled, onToggleNotifications, autoCategorize, onToggleAutoCategorize, smartSuggestions, onToggleSmartSuggestions, assets, debts, bills, goals, recurringPayments, onImportTransactions, onAddAsset, onAddDebt, onDeleteAsset, onDeleteDebt, onDeleteBill, onDeleteGoal, onDeleteRecurring, onDeleteTransactions } = props;
+    const { categories, onAddCategory, onUpdateCategory, onDeleteCategory, rules, onAddRule, onUpdateRule, onDeleteRule, onWipeData, notificationsEnabled, onToggleNotifications, autoCategorize, onToggleAutoCategorize, smartSuggestions, onToggleSmartSuggestions, assets, debts, bills, goals, recurringPayments, onImportTransactions, onAddAsset, onAddDebt, onDeleteAsset, onDeleteDebt, onDeleteBill, onDeleteGoal, onDeleteRecurring, onDeleteTransactions } = props;
     const [isCatModalOpen, setIsCatModalOpen] = useState(false);
     const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
     const [isWipeModalOpen, setIsWipeModalOpen] = useState(false);

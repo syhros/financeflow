@@ -75,13 +75,13 @@ const Categorize: React.FC<CategorizeProps> = ({ transactions: uncategorizedTxs,
     const [isEditing, setIsEditing] = useState(false);
     const [editedMerchant, setEditedMerchant] = useState('');
     const [editedCategory, setEditedCategory] = useState('');
-    const [cardAnimation, setCardAnimation] = useState('');
     const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
     const [pendingCategorization, setPendingCategorization] = useState<{ merchant: string; category: string; } | null>(null);
     const [dragOffset, setDragOffset] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const cardStackRef = useRef<HTMLDivElement>(null);
     const startXRef = useRef(0);
+    const animationFrameRef = useRef<number | null>(null);
 
     const { formatCurrency } = useCurrency();
 
@@ -105,7 +105,6 @@ const Categorize: React.FC<CategorizeProps> = ({ transactions: uncategorizedTxs,
 
     const advanceCard = () => {
         setCurrentIndex(prev => Math.min(prev + 1, uncategorizedTxs.length));
-        setCardAnimation('');
         setIsEditing(false);
         setDragOffset(0);
     };
@@ -114,16 +113,23 @@ const Categorize: React.FC<CategorizeProps> = ({ transactions: uncategorizedTxs,
         if (!cardStackRef.current || isEditing) return;
         setIsDragging(true);
         startXRef.current = e.clientX;
+        setDragOffset(0);
     };
 
     const handlePointerMove = (e: React.PointerEvent) => {
         if (!isDragging || !cardStackRef.current) return;
-        const delta = e.clientX - startXRef.current;
-        setDragOffset(delta);
+        if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+
+        animationFrameRef.current = requestAnimationFrame(() => {
+            const delta = e.clientX - startXRef.current;
+            setDragOffset(delta);
+        });
     };
 
     const handlePointerUp = (e: React.PointerEvent) => {
         if (!isDragging) return;
+        if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+
         setIsDragging(false);
 
         const threshold = 100;
@@ -148,11 +154,10 @@ const Categorize: React.FC<CategorizeProps> = ({ transactions: uncategorizedTxs,
 
         setPendingCategorization({ merchant: merchantToSave, category: categoryToSave });
         setIsRuleModalOpen(true);
-        setCardAnimation('translate-x-full rotate-12 opacity-0');
 
         setTimeout(() => {
-            advanceCard();
-        }, 300);
+            processTransactionAndAnimate();
+        }, 100);
     };
 
     const handleRejectCard = () => {
@@ -162,10 +167,7 @@ const Categorize: React.FC<CategorizeProps> = ({ transactions: uncategorizedTxs,
             setEditedCategory(suggestedCategory);
             setDragOffset(0);
         } else {
-            setCardAnimation('-translate-x-full -rotate-12 opacity-0');
-            setTimeout(() => {
-                advanceCard();
-            }, 300);
+            advanceCard();
         }
     };
 
@@ -180,6 +182,7 @@ const Categorize: React.FC<CategorizeProps> = ({ transactions: uncategorizedTxs,
         });
 
         setPendingCategorization(null);
+        advanceCard();
     };
 
     const handleCreateRule = () => {
@@ -191,12 +194,10 @@ const Categorize: React.FC<CategorizeProps> = ({ transactions: uncategorizedTxs,
             });
         }
         setIsRuleModalOpen(false);
-        processTransactionAndAnimate();
     };
 
     const handleDeclineRule = () => {
         setIsRuleModalOpen(false);
-        processTransactionAndAnimate();
     };
 
     const handleReject = () => {
@@ -211,7 +212,7 @@ const Categorize: React.FC<CategorizeProps> = ({ transactions: uncategorizedTxs,
     const completedTransactions = currentIndex;
     const progress = totalTransactions > 0 ? (completedTransactions / totalTransactions) * 100 : 100;
 
-    const overlayOpacity = dragOffset !== 0 ? Math.min(Math.abs(dragOffset) / 150, 0.5) : 0;
+    const overlayOpacity = dragOffset !== 0 ? Math.min(Math.abs(dragOffset) / 200, 0.5) : 0;
     const isSwipingRight = dragOffset > 0;
 
     return (
@@ -226,90 +227,113 @@ const Categorize: React.FC<CategorizeProps> = ({ transactions: uncategorizedTxs,
             <div className="flex flex-col items-center justify-center h-full">
                 <div className="text-center mb-8">
                     <h2 className="text-2xl font-semibold text-white">Uncategorised Transactions</h2>
-                    <p className="text-gray-500">Swipe or tap to sort</p>
+                    <p className="text-gray-500">Swipe left or right to sort</p>
                 </div>
 
                 <div
                     ref={cardStackRef}
-                    className="relative w-full max-w-sm h-96 mb-12 touch-none"
+                    className="relative w-full max-w-sm h-96 mb-12 touch-none select-none"
                     onPointerDown={handlePointerDown}
                     onPointerMove={handlePointerMove}
                     onPointerUp={handlePointerUp}
                     onPointerLeave={handlePointerUp}
                 >
-                    {currentTx && (
-                        <Card
-                            className={`absolute w-full h-96 flex flex-col justify-between items-center text-center transition-all duration-300 ease-in-out z-30 ${cardAnimation}`}
-                            style={{
-                                transform: isDragging ? `translateX(${dragOffset}px) rotateY(${dragOffset * 0.1}deg)` : undefined,
-                            }}
-                        >
-                            <div className="absolute inset-0 rounded-2xl pointer-events-none overflow-hidden">
-                                {isDragging && (
-                                    <>
-                                        {isSwipingRight && (
-                                            <div
-                                                className="absolute inset-0 bg-green-500 transition-opacity"
-                                                style={{ opacity: overlayOpacity }}
-                                            />
-                                        )}
-                                        {!isSwipingRight && (
-                                            <div
-                                                className="absolute inset-0 bg-red-500 transition-opacity"
-                                                style={{ opacity: overlayOpacity }}
-                                            />
-                                        )}
-                                    </>
-                                )}
-                            </div>
+                    {uncategorizedTxs.map((tx, index) => {
+                        const position = index - currentIndex;
+                        if (position < 0 || position > 2) return null;
 
-                            <div className="relative z-10">
-                                <p className="text-sm text-gray-400">{currentAccountName}</p>
-                                <p className="text-6xl font-bold text-white my-2">{formatCurrency(currentTx.amount)}</p>
+                        const isTopCard = position === 0;
+                        const offset = position + 1;
+                        const zIndex = 100 - offset;
+                        const stackOffsetY = 7 * offset;
+                        const stackOffsetZ = -12 * offset;
 
-                                <div className="flex items-center justify-center gap-3 mt-3 mb-2">
-                                    {currentTx.type === 'income' ? (
-                                        <div className="bg-green-500/20 px-3 py-1 rounded-full">
-                                            <span className="text-sm font-semibold text-green-300">Income</span>
-                                        </div>
-                                    ) : (
-                                        <div className="bg-red-500/20 px-3 py-1 rounded-full">
-                                            <span className="text-sm font-semibold text-red-300">Expense</span>
+                        return (
+                            <div
+                                key={tx.id}
+                                className={`absolute w-full h-96 transition-all ${
+                                    isDragging && isTopCard ? 'duration-0' : 'duration-300'
+                                }`}
+                                style={{
+                                    zIndex: zIndex,
+                                    transform: isTopCard && isDragging
+                                        ? `perspective(700px) translateZ(${stackOffsetZ}px) translateY(${stackOffsetY}px) translateX(${dragOffset}px) rotateY(${dragOffset * 0.1}deg)`
+                                        : `perspective(700px) translateZ(${stackOffsetZ}px) translateY(${stackOffsetY}px) translateX(0px) rotateY(0deg)`,
+                                }}
+                            >
+                                <Card
+                                    className="w-full h-96 flex flex-col justify-between items-center text-center relative"
+                                >
+                                    {isTopCard && isDragging && (
+                                        <div className="absolute inset-0 rounded-2xl pointer-events-none overflow-hidden z-20">
+                                            {isSwipingRight && (
+                                                <div
+                                                    className="absolute inset-0 bg-green-500 transition-opacity"
+                                                    style={{ opacity: overlayOpacity }}
+                                                />
+                                            )}
+                                            {!isSwipingRight && (
+                                                <div
+                                                    className="absolute inset-0 bg-red-500 transition-opacity"
+                                                    style={{ opacity: overlayOpacity }}
+                                                />
+                                            )}
                                         </div>
                                     )}
-                                </div>
 
-                                <p className="text-lg text-gray-300">{currentTx.merchant}</p>
+                                    {isTopCard && (
+                                        <>
+                                            <div className="relative z-10 pt-6">
+                                                <p className="text-sm text-gray-400">{currentAccountName}</p>
+                                                <p className="text-6xl font-bold text-white my-2">{formatCurrency(tx.amount)}</p>
+
+                                                <div className="flex items-center justify-center gap-3 mt-3 mb-2">
+                                                    {tx.type === 'income' ? (
+                                                        <div className="bg-green-500/20 px-3 py-1 rounded-full">
+                                                            <span className="text-sm font-semibold text-green-300">Income</span>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="bg-red-500/20 px-3 py-1 rounded-full">
+                                                            <span className="text-sm font-semibold text-red-300">Expense</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <p className="text-lg text-gray-300">{tx.merchant}</p>
+                                            </div>
+
+                                            {isEditing ? (
+                                                <div className="relative z-10 w-full px-4 pb-4 space-y-3">
+                                                    <input
+                                                        type="text"
+                                                        value={editedMerchant}
+                                                        onChange={(e) => setEditedMerchant(e.target.value)}
+                                                        className="w-full bg-gray-700 text-white text-center rounded-lg px-3 py-2 border border-gray-600 focus:border-primary outline-none transition-colors"
+                                                        placeholder="Merchant Name"
+                                                    />
+                                                    <select
+                                                        value={editedCategory}
+                                                        onChange={(e) => setEditedCategory(e.target.value)}
+                                                        className="w-full bg-gray-700 text-white text-center rounded-lg px-3 py-2 border border-gray-600 focus:border-primary outline-none transition-colors"
+                                                    >
+                                                        <option value="">Select Category</option>
+                                                        {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                                                    </select>
+                                                </div>
+                                            ) : (
+                                                <div className="relative z-10 pb-4">
+                                                    <p className="text-sm font-semibold text-primary">Suggested: {suggestedMerchant}</p>
+                                                    <p className="text-sm font-semibold mt-1 text-primary">Category: {suggestedCategory}</p>
+                                                </div>
+                                            )}
+
+                                            <p className="relative z-10 text-xs text-gray-500">{format(new Date(tx.date), 'dd MMM yyyy')}</p>
+                                        </>
+                                    )}
+                                </Card>
                             </div>
-
-                            {isEditing ? (
-                                <div className="relative z-10 w-full px-4 pb-4 space-y-3">
-                                    <input
-                                        type="text"
-                                        value={editedMerchant}
-                                        onChange={(e) => setEditedMerchant(e.target.value)}
-                                        className="w-full bg-gray-700 text-white text-center rounded-lg px-3 py-2 border border-gray-600 focus:border-primary outline-none transition-colors"
-                                        placeholder="Merchant Name"
-                                    />
-                                    <select
-                                        value={editedCategory}
-                                        onChange={(e) => setEditedCategory(e.target.value)}
-                                        className="w-full bg-gray-700 text-white text-center rounded-lg px-3 py-2 border border-gray-600 focus:border-primary outline-none transition-colors"
-                                    >
-                                        <option value="">Select Category</option>
-                                        {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                                    </select>
-                                </div>
-                            ) : (
-                                <div className="relative z-10 pb-4">
-                                    <p className="text-sm font-semibold text-primary">Suggested: {suggestedMerchant}</p>
-                                    <p className="text-sm font-semibold mt-1 text-primary">Category: {suggestedCategory}</p>
-                                </div>
-                            )}
-
-                            <p className="relative z-10 text-xs text-gray-500">{format(new Date(currentTx.date), 'dd MMM yyyy')}</p>
-                        </Card>
-                    )}
+                        );
+                    })}
 
                     {currentIndex >= uncategorizedTxs.length && (
                         <Card className="w-full h-96 flex flex-col justify-center items-center text-center absolute z-10">
