@@ -4,6 +4,7 @@ import { Category, Currency, Asset, Debt, TransactionRule, Transaction, Goal, Bi
 import { PlusIcon, CloseIcon, PencilIcon, TrashIcon, ShoppingBagIcon, GiftIcon, FilmIcon, CloudIcon, WrenchScrewdriverIcon, BanknotesIcon, HomeModernIcon, CarIcon, RefreshIcon, LightBulbIcon, iconMap } from './icons';
 import { useCurrency } from '../App';
 import JSZip from 'jszip';
+import CSVImportPreviewModal from './CSVImportPreviewModal';
 
 interface SettingsProps {
     categories: Category[];
@@ -721,314 +722,6 @@ const AccountMappingModal: React.FC<{
     );
 };
 
-const ImportDataModal: React.FC<{isOpen: boolean, onClose: () => void, onImport: (transactions: Transaction[]) => void, onAddAsset: (asset: Omit<Asset, 'id'>) => void, onAddDebt: (debt: Omit<Debt, 'id'>) => void, assets: Asset[], debts: Debt[]}> = ({isOpen, onClose, onImport, onAddAsset, onAddDebt, assets, debts}) => {
-    const [isDragging, setIsDragging] = useState(false);
-    const [error, setError] = useState<string>('');
-    const [success, setSuccess] = useState<string>('');
-    const [showAccountMapping, setShowAccountMapping] = useState(false);
-    const [pendingAccountName, setPendingAccountName] = useState('');
-    const [pendingTransactions, setPendingTransactions] = useState<any[]>([]);
-    const [accountMappings, setAccountMappings] = useState<Map<string, string>>(new Map());
-    const fileInputRef = React.useRef<HTMLInputElement>(null);
-
-    const processCSV = (text: string) => {
-        const lines = text.split('\n').filter(line => line.trim());
-
-        if (lines.length < 2) {
-            setError('CSV file is empty or invalid');
-            return;
-        }
-
-        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-        const rawTransactions: any[] = [];
-        const unmappedAccounts = new Set<string>();
-
-        // Create account lookup by name
-        const allAccountsForImport = [...assets, ...debts];
-        const accountNameToId = new Map(allAccountsForImport.map(a => [a.name.toLowerCase(), a.id!]));
-
-        for (let i = 1; i < lines.length; i++) {
-            const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
-
-            if (values.length !== headers.length) continue;
-
-            const transaction: any = {};
-            headers.forEach((header, index) => {
-                transaction[header.toLowerCase()] = values[index];
-            });
-
-            if (transaction.date && transaction.merchant && transaction.amount) {
-                rawTransactions.push(transaction);
-
-                // Check if account exists
-                if (transaction.account) {
-                    const accountLower = transaction.account.toLowerCase();
-                    if (!accountNameToId.has(accountLower) && !accountMappings.has(accountLower)) {
-                        unmappedAccounts.add(transaction.account);
-                    }
-                }
-            }
-        }
-
-        if (unmappedAccounts.size > 0) {
-            // Show modal for first unmapped account
-            const firstUnmapped = Array.from(unmappedAccounts)[0];
-            setPendingAccountName(firstUnmapped);
-            setPendingTransactions(rawTransactions);
-            setShowAccountMapping(true);
-            return;
-        }
-
-        // All accounts mapped, process transactions
-        const transactions: Transaction[] = rawTransactions.map((tx, i) => {
-            let accountId = allAccountsForImport[0]?.id || '1';
-
-            if (tx.account) {
-                const accountLower = tx.account.toLowerCase();
-                const mappedId = accountMappings.get(accountLower) || accountNameToId.get(accountLower);
-                if (mappedId) accountId = mappedId;
-            }
-
-            return {
-                id: `import-${Date.now()}-${i}`,
-                merchant: tx.merchant,
-                category: tx.category || 'Uncategorized',
-                date: tx.date,
-                amount: parseFloat(tx.amount),
-                type: tx.type || 'expense',
-                accountId: accountId,
-                logo: `https://logo.clearbit.com/${tx.merchant.toLowerCase().replace(/\s+/g, '')}.com`
-            };
-        });
-
-        if (transactions.length === 0) {
-            setError('No valid transactions found in CSV');
-            return;
-        }
-
-        onImport(transactions);
-        setSuccess(`Successfully imported ${transactions.length} transactions!`);
-
-        setTimeout(() => {
-            setAccountMappings(new Map());
-            onClose();
-        }, 2000);
-    };
-
-    const handleFileSelect = (file: File) => {
-        setError('');
-        setSuccess('');
-        setAccountMappings(new Map());
-
-        if (!file.name.endsWith('.csv')) {
-            setError('Please select a CSV file');
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const text = e.target?.result as string;
-                processCSV(text);
-            } catch (err) {
-                setError('Error parsing CSV file. Please check the format.');
-            }
-        };
-        reader.readAsText(file);
-    };
-
-    const handleSaveNewAccount = (name: string, type: string) => {
-        const isDebtType = type === 'Credit Card' || type === 'Loan';
-
-        if (isDebtType) {
-            onAddDebt({
-                accountType: 'debt',
-                name,
-                type,
-                balance: 0,
-                interestRate: 0,
-                minPayment: 0,
-                originalBalance: 0,
-                status: 'Active',
-                lastUpdated: 'just now',
-                icon: type === 'Credit Card' ? 'CreditCardIcon' : 'LoanIcon',
-                color: 'bg-gray-700'
-            });
-
-            // Wait for state update
-            setTimeout(() => {
-                const newDebt = debts[debts.length - 1];
-                if (newDebt) {
-                    setAccountMappings(prev => new Map(prev).set(pendingAccountName.toLowerCase(), newDebt.id!));
-                }
-                setShowAccountMapping(false);
-
-                // Continue processing
-                setTimeout(() => {
-                    if (pendingTransactions.length > 0) {
-                        const reader = new FileReader();
-                        const csvContent = reconstructCSV(pendingTransactions);
-                        processCSV(csvContent);
-                    }
-                }, 100);
-            }, 100);
-        } else {
-            onAddAsset({
-                accountType: 'asset',
-                name,
-                type,
-                balance: 0,
-                interestRate: 0,
-                status: 'Active',
-                lastUpdated: 'just now',
-                icon: 'AccountsIcon',
-                color: 'bg-green-500',
-                holdings: []
-            });
-
-            // Wait for state update
-            setTimeout(() => {
-                const newAsset = assets[assets.length - 1];
-                if (newAsset) {
-                    setAccountMappings(prev => new Map(prev).set(pendingAccountName.toLowerCase(), newAsset.id!));
-                }
-                setShowAccountMapping(false);
-
-                // Continue processing
-                setTimeout(() => {
-                    if (pendingTransactions.length > 0) {
-                        const csvContent = reconstructCSV(pendingTransactions);
-                        processCSV(csvContent);
-                    }
-                }, 100);
-            }, 100);
-        }
-    };
-
-    const handleSelectExisting = (accountId: string) => {
-        setAccountMappings(prev => new Map(prev).set(pendingAccountName.toLowerCase(), accountId));
-        setShowAccountMapping(false);
-
-        // Continue processing
-        setTimeout(() => {
-            if (pendingTransactions.length > 0) {
-                const csvContent = reconstructCSV(pendingTransactions);
-                processCSV(csvContent);
-            }
-        }, 100);
-    };
-
-    const handleCancelMapping = () => {
-        // Skip transactions for this account
-        const filteredTransactions = pendingTransactions.filter(
-            tx => tx.account?.toLowerCase() !== pendingAccountName.toLowerCase()
-        );
-        setPendingTransactions(filteredTransactions);
-        setShowAccountMapping(false);
-
-        if (filteredTransactions.length > 0) {
-            setTimeout(() => {
-                const csvContent = reconstructCSV(filteredTransactions);
-                processCSV(csvContent);
-            }, 100);
-        } else {
-            setError('No transactions remaining after skipping unmapped accounts');
-        }
-    };
-
-    const reconstructCSV = (transactions: any[]) => {
-        const headers = 'Date,Merchant,Category,Amount,Account,Type';
-        const rows = transactions.map(tx =>
-            `"${tx.date}","${tx.merchant}","${tx.category}","${tx.amount}","${tx.account}","${tx.type}"`
-        );
-        return [headers, ...rows].join('\n');
-    };
-
-    const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragging(false);
-        const file = e.dataTransfer.files[0];
-        if (file) handleFileSelect(file);
-    };
-
-    const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) handleFileSelect(file);
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <>
-            <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" onClick={onClose}>
-                <div className="bg-card-bg rounded-lg shadow-xl w-full max-w-2xl border border-border-color" onClick={e => e.stopPropagation()}>
-                    <div className="flex justify-between items-center p-6 border-b border-border-color">
-                        <h2 className="text-2xl font-bold text-white">Import Data from CSV</h2>
-                        <button onClick={onClose} className="text-gray-400 hover:text-white">
-                            <CloseIcon className="w-6 h-6" />
-                        </button>
-                    </div>
-                <div className="p-6">
-                    <div
-                        className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${
-                            isDragging ? 'border-primary bg-primary/10' : 'border-gray-600 hover:border-gray-500'
-                        }`}
-                        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                        onDragLeave={() => setIsDragging(false)}
-                        onDrop={handleDrop}
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-16 h-16 mx-auto mb-4 text-gray-400">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                        </svg>
-                        <p className="text-lg text-white mb-2">Drag and drop your CSV file here</p>
-                        <p className="text-sm text-gray-400 mb-4">or</p>
-                        <button
-                            onClick={() => fileInputRef.current?.click()}
-                            className="px-6 py-2 bg-primary text-white rounded-lg font-semibold hover:opacity-90"
-                        >
-                            Browse Files
-                        </button>
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".csv"
-                            onChange={handleFileInput}
-                            className="hidden"
-                        />
-                    </div>
-
-                    {error && (
-                        <div className="mt-4 p-3 bg-red-500/20 border border-red-500 rounded-lg">
-                            <p className="text-red-400 text-sm">{error}</p>
-                        </div>
-                    )}
-
-                    {success && (
-                        <div className="mt-4 p-3 bg-green-500/20 border border-green-500 rounded-lg">
-                            <p className="text-green-400 text-sm">{success}</p>
-                        </div>
-                    )}
-
-                    <div className="mt-6 p-4 bg-gray-800 rounded-lg">
-                        <p className="text-sm text-gray-300 font-semibold mb-2">CSV Format:</p>
-                        <p className="text-xs text-gray-400 font-mono">Date,Merchant,Category,Amount,Account,Type</p>
-                        <p className="text-xs text-gray-500 mt-2">Make sure your CSV matches this format for successful import.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-            <AccountMappingModal
-                isOpen={showAccountMapping}
-                onClose={handleCancelMapping}
-                accountName={pendingAccountName}
-                onSaveNew={handleSaveNewAccount}
-                onSelectExisting={handleSelectExisting}
-                existingAccounts={[...assets, ...debts]}
-            />
-        </>
-    );
-};
 
 const ExportDataModal: React.FC<{isOpen: boolean, onClose: () => void, assets: Asset[], debts: Debt[]}> = ({isOpen, onClose, assets, debts}) => {
     const allAccounts = [...assets, ...debts];
@@ -1542,6 +1235,75 @@ const Settings: React.FC<SettingsProps> = (props) => {
 
     const currencyMap: {[key in Currency]: string} = { 'GBP': 'GBP (£)', 'USD': 'USD ($)', 'EUR': 'EUR (€)' };
 
+    const handleCSVImport = (importedData: any[], selectedAccountId: string) => {
+        const allAccounts = [...assets, ...debts];
+        const accountNameToId = new Map(allAccounts.map(a => [a.name.toLowerCase(), a.id!]));
+
+        const transactions: Transaction[] = importedData.map((tx, i) => {
+            let accountId = selectedAccountId;
+
+            if (selectedAccountId.startsWith('new:')) {
+                const [, name, type] = selectedAccountId.split(':');
+                const isDebtType = type === 'Credit Card' || type === 'Loan';
+
+                if (isDebtType) {
+                    onAddDebt({
+                        accountType: 'debt',
+                        name,
+                        type,
+                        balance: 0,
+                        interestRate: 0,
+                        minPayment: 0,
+                        originalBalance: 0,
+                        status: 'Active',
+                        lastUpdated: 'just now',
+                        icon: type === 'Credit Card' ? 'CreditCardIcon' : 'LoanIcon',
+                        color: 'bg-gray-700'
+                    });
+                } else {
+                    onAddAsset({
+                        accountType: 'asset',
+                        name,
+                        type,
+                        balance: 0,
+                        interestRate: 0,
+                        status: 'Active',
+                        lastUpdated: 'just now',
+                        icon: 'AccountsIcon',
+                        color: 'bg-green-500',
+                        holdings: []
+                    });
+                }
+                accountId = selectedAccountId;
+            }
+
+            const resolveAccountId = (accountName?: string) => {
+                if (!accountName) return accountId;
+                const resolved = accountNameToId.get(accountName.toLowerCase());
+                return resolved || accountId;
+            };
+
+            return {
+                id: `import-${Date.now()}-${i}`,
+                logo: tx.logo || '',
+                merchant: tx.merchant || 'Transaction',
+                category: tx.category || 'Uncategorized',
+                date: tx.date,
+                amount: Math.abs(tx.amount),
+                type: tx.type || 'expense',
+                accountId: resolveAccountId(tx.sourceAccount),
+                recipientAccountId: tx.recipientAccount ? resolveAccountId(tx.recipientAccount) : undefined,
+                sourceAccountId: tx.sourceAccount ? resolveAccountId(tx.sourceAccount) : undefined,
+                ticker: tx.ticker,
+                shares: tx.shares,
+                purchasePrice: tx.purchasePrice,
+            };
+        });
+
+        onImportTransactions(transactions);
+        alert(`Successfully imported ${transactions.length} transactions!`);
+    };
+
     return (
         <>
             <ManageCategoriesModal isOpen={isCatModalOpen} onClose={() => setIsCatModalOpen(false)} categories={categories} onAddCategory={onAddCategory} onUpdateCategory={onUpdateCategory} onDeleteCategory={onDeleteCategory} />
@@ -1549,7 +1311,7 @@ const Settings: React.FC<SettingsProps> = (props) => {
             <WipeDataModal isOpen={isWipeModalOpen} onClose={() => setIsWipeModalOpen(false)} onWipe={onWipeData} />
             <CustomDataDeletionModal isOpen={isCustomDeletionModalOpen} onClose={() => setIsCustomDeletionModalOpen(false)} assets={assets} debts={debts} bills={bills} goals={goals} recurringPayments={recurringPayments} onDeleteAccount={(id) => { const asset = assets.find(a => a.id === id); const debt = debts.find(d => d.id === id); if (asset) onDeleteAsset(id); else if (debt) onDeleteDebt(id); }} onDeleteBill={onDeleteBill} onDeleteGoal={onDeleteGoal} onDeleteRecurring={onDeleteRecurring} onDeleteTransactions={onDeleteTransactions} />
             <ExportDataModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} assets={assets} debts={debts} />
-            <ImportDataModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onImport={onImportTransactions} onAddAsset={onAddAsset} onAddDebt={onAddDebt} assets={assets} debts={debts} />
+            <CSVImportPreviewModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onImport={handleCSVImport} assets={assets} />
             <BackupDataModal isOpen={isBackupModalOpen} onClose={() => setIsBackupModalOpen(false)} />
             <ImportBackupModal isOpen={isImportBackupModalOpen} onClose={() => setIsImportBackupModalOpen(false)} onImportComplete={() => setIsImportBackupModalOpen(false)} />
 

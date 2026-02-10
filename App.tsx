@@ -595,10 +595,18 @@ const App: React.FC = () => {
         const balanceChanges = new Map<string, number>();
 
         importedTransactions.forEach(tx => {
-            const currentChange = balanceChanges.get(tx.accountId) || 0;
-            if (tx.type === 'income') {
+            if (tx.type === 'transfer' && tx.recipientAccountId) {
+                // Transfer: deduct from source, add to recipient
+                const sourceChange = balanceChanges.get(tx.accountId) || 0;
+                balanceChanges.set(tx.accountId, sourceChange - tx.amount);
+
+                const recipientChange = balanceChanges.get(tx.recipientAccountId) || 0;
+                balanceChanges.set(tx.recipientAccountId, recipientChange + tx.amount);
+            } else if (tx.type === 'income') {
+                const currentChange = balanceChanges.get(tx.accountId) || 0;
                 balanceChanges.set(tx.accountId, currentChange + tx.amount);
             } else if (tx.type === 'expense') {
+                const currentChange = balanceChanges.get(tx.accountId) || 0;
                 balanceChanges.set(tx.accountId, currentChange - tx.amount);
             }
         });
