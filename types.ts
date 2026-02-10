@@ -61,6 +61,13 @@ export interface Transaction {
     ticker?: string;
     shares?: number;
     purchasePrice?: number;
+    pricePerShare?: number;
+    action?: 'buy' | 'sell';
+    name?: string;
+    currencyPrice?: string;
+    exchangeRate?: number;
+    total?: number;
+    currencyTotal?: string;
     sourceAccountId?: string; // The cash account used for purchases or debt payments
     recipientAccountId?: string; // The recipient account for transfers
 }

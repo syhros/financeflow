@@ -13,11 +13,12 @@ interface ColumnMapping {
 }
 
 const BANKING_FIELDS = ['date', 'merchant', 'category', 'amount', 'source_account', 'recipient_account', 'logo'];
-const INVESTMENT_FIELDS = ['date', 'ticker', 'shares', 'purchase_price', 'source_account', 'type', 'amount'];
+const INVESTMENT_FIELDS = ['date', 'action', 'ticker', 'name', 'shares', 'price_per_share', 'currency_price', 'exchange_rate', 'total', 'currency_total'];
 
 const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, onClose, onImport, assets }) => {
   const [mode, setMode] = useState<'banking' | 'investments'>('banking');
   const [csvData, setCsvData] = useState<string[][]>([]);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({});
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [showAccountCreation, setShowAccountCreation] = useState(false);
@@ -29,16 +30,56 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
   const fieldsForMode = mode === 'banking' ? BANKING_FIELDS : INVESTMENT_FIELDS;
   const requiredFields = mode === 'banking'
     ? ['date', 'amount', 'source_account']
-    : ['date', 'ticker', 'shares', 'source_account', 'type', 'amount'];
+    : ['date', 'action', 'ticker', 'shares', 'total'];
+
+  const getFieldLabel = (field: string) => {
+    const labels: Record<string, string> = {
+      date: 'Date',
+      action: 'Action (Buy/Sell)',
+      merchant: 'Merchant',
+      category: 'Category',
+      amount: 'Amount',
+      source_account: 'Source Account',
+      recipient_account: 'Recipient Account',
+      logo: 'Logo',
+      ticker: 'Ticker',
+      name: 'Name',
+      shares: 'Shares',
+      price_per_share: 'Price / Share',
+      currency_price: 'Currency (Price)',
+      exchange_rate: 'Exchange Rate',
+      total: 'Total',
+      currency_total: 'Currency (Total)',
+    };
+    return labels[field] || field;
+  };
 
   const handleFileSelect = (file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
       const lines = text.trim().split('\n');
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-      const rows = lines.slice(1, 16).map(line => line.split(',').map(cell => cell.trim()));
+      const headers = lines[0].split(',').map(h => h.trim());
+      const rows = lines.slice(1, 11).map(line => {
+        const cells: string[] = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            cells.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        cells.push(current.trim());
+        return cells;
+      });
 
+      setCsvHeaders(headers);
       setCsvData(rows);
       initializeColumnMapping(headers);
       setStep('mapping');
@@ -50,8 +91,8 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
     const mapping: ColumnMapping = {};
     fieldsForMode.forEach(field => {
       const headerIndex = headers.findIndex(h =>
-        h.includes(field.toLowerCase()) ||
-        field.toLowerCase().includes(h)
+        h.toLowerCase().includes(field.toLowerCase()) ||
+        field.toLowerCase().includes(h.toLowerCase())
       );
       mapping[field] = headerIndex >= 0 ? headerIndex : null;
     });
@@ -68,10 +109,17 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
 
   const handleCreateAccount = () => {
     if (!newAccountName.trim()) return;
-    // Account will be created in App.tsx
     setSelectedAccountId(`new:${newAccountName}:${newAccountType}`);
     setShowAccountCreation(false);
     setNewAccountName('');
+  };
+
+  const getColumnDisplay = (columnIndex: number) => {
+    const mappedField = Object.entries(columnMapping).find(([_, idx]) => idx === columnIndex)?.[0];
+    if (mappedField) {
+      return <span className="font-bold text-white">{getFieldLabel(mappedField)}</span>;
+    }
+    return <span className="italic text-gray-400">{csvHeaders[columnIndex]}</span>;
   };
 
   const parseTransactions = () => {
@@ -116,26 +164,37 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
           });
         } else {
           const date = getValue('date');
+          const action = getValue('action');
           const ticker = getValue('ticker');
+          const name = getValue('name');
           const shares = parseFloat(getValue('shares') || '0');
-          const purchasePrice = parseFloat(getValue('purchase_price') || '0');
-          const sourceAccount = getValue('source_account');
-          const transactionType = getValue('type') || 'buy';
-          const amount = parseFloat(getValue('amount') || '0');
+          const pricePerShare = parseFloat(getValue('price_per_share') || '0');
+          const currencyPrice = getValue('currency_price') || 'GBP';
+          const exchangeRate = parseFloat(getValue('exchange_rate') || '1');
+          const total = parseFloat(getValue('total') || '0');
+          const currencyTotal = getValue('currency_total') || 'GBP';
 
-          if (!date || !ticker || !shares) return;
+          if (!date || !action || !ticker || !shares || !total) return;
+
+          const isBuy = action.toLowerCase().includes('buy');
+          const purchasePrice = pricePerShare || (total / shares);
 
           transactions.push({
             id: `import-${rowIndex}`,
             date,
+            action: isBuy ? 'buy' : 'sell',
             ticker,
-            shares,
-            purchasePrice: purchasePrice || (amount / shares),
+            name: name || ticker,
+            shares: isBuy ? shares : -shares,
+            pricePerShare,
+            currencyPrice,
+            exchangeRate,
+            total,
+            currencyTotal,
             type: 'investing',
-            amount: amount || (shares * purchasePrice),
-            sourceAccount: sourceAccount || selectedAccountId,
+            amount: total,
             accountId: selectedAccountId,
-            merchant: `${transactionType.toUpperCase()} ${ticker}`,
+            merchant: `${isBuy ? 'BUY' : 'SELL'} ${shares} × ${ticker}`,
             category: 'Investments',
             logo: '',
           });
@@ -162,7 +221,7 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" onClick={onClose}>
-      <div className="bg-card-bg rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto border border-border-color" onClick={e => e.stopPropagation()}>
+      <div className="bg-card-bg rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-y-auto border border-border-color" onClick={e => e.stopPropagation()}>
         <div className="sticky top-0 flex justify-between items-center p-4 border-b border-border-color bg-card-bg z-10">
           <h2 className="text-xl font-bold text-white">Import CSV Data</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white">✕</button>
@@ -206,10 +265,6 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
                 <div className="space-y-2">
                   <p className="text-white font-semibold">Drag and drop your CSV file here</p>
                   <p className="text-gray-400 text-sm">or click to browse</p>
-                  <div className="mt-4 text-left bg-gray-800 rounded p-4">
-                    <p className="text-xs text-gray-300 font-semibold mb-2">Expected Columns ({mode}):</p>
-                    <p className="text-xs text-gray-400">{fieldsForMode.join(', ')}</p>
-                  </div>
                 </div>
                 <input
                   ref={fileInputRef}
@@ -223,57 +278,59 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
           )}
 
           {step === 'mapping' && (
-            <div>
-              <div className="mb-4">
+            <div className="space-y-6">
+              <div>
                 <label className="text-sm font-semibold text-gray-300 mb-3 block">Map CSV Columns to Fields</label>
-                <div className="grid grid-cols-2 gap-4">
-                  {fieldsForMode.map(field => (
-                    <div key={field}>
-                      <label className="text-xs text-gray-400 mb-1 block capitalize">{field.replace('_', ' ')}</label>
-                      <select
-                        value={columnMapping[field] ?? ''}
-                        onChange={e => setColumnMapping({
-                          ...columnMapping,
-                          [field]: e.target.value ? parseInt(e.target.value) : null
-                        })}
-                        className="w-full bg-gray-700 text-white rounded px-3 py-2 border border-gray-600 focus:border-blue-500 outline-none text-sm"
-                      >
-                        <option value="">-- Skip --</option>
-                        {csvData.length > 0 && Array.from({ length: csvData[0].length }).map((_, i) => (
-                          <option key={i} value={i}>{i}: {csvData[0][i]}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
+                <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+                  {fieldsForMode.map(field => {
+                    const isRequired = requiredFields.includes(field);
+                    return (
+                      <div key={field} className={isRequired ? 'ring-1 ring-blue-500/50 rounded-lg p-3' : ''}>
+                        <label className={`text-xs font-semibold mb-1 block ${isRequired ? 'text-blue-400' : 'text-gray-400'}`}>
+                          {getFieldLabel(field)} {isRequired && '*'}
+                        </label>
+                        <select
+                          value={columnMapping[field] ?? ''}
+                          onChange={e => setColumnMapping({
+                            ...columnMapping,
+                            [field]: e.target.value ? parseInt(e.target.value) : null
+                          })}
+                          className="w-full bg-gray-700 text-white rounded px-3 py-2 border border-gray-600 focus:border-blue-500 outline-none text-sm"
+                        >
+                          <option value="">-- Skip --</option>
+                          {csvHeaders.map((_, i) => (
+                            <option key={i} value={i}>{i}: {csvHeaders[i]}</option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              <div className="mt-6">
-                <h3 className="text-sm font-semibold text-gray-300 mb-3">Preview (First {csvData.length} rows)</h3>
-                <div className="overflow-x-auto bg-gray-800 rounded-lg">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-300 mb-3">CSV Preview</h3>
+                <div className="overflow-x-auto bg-gray-800 rounded-lg border border-gray-700">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-gray-700">
-                        <th className="px-3 py-2 text-left text-gray-400">#</th>
-                        {fieldsForMode.map(field => (
-                          <th key={field} className="px-3 py-2 text-left text-gray-400 capitalize whitespace-nowrap">
-                            {field.replace('_', ' ')}
+                      <tr className="border-b border-gray-700 bg-gray-900">
+                        <th className="px-3 py-2 text-left text-gray-400 font-normal">#</th>
+                        {csvHeaders.map((_, colIdx) => (
+                          <th key={colIdx} className="px-3 py-2 text-left text-gray-400 font-normal whitespace-nowrap">
+                            {getColumnDisplay(colIdx)}
                           </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {csvData.slice(0, 5).map((row, rowIdx) => (
+                      {csvData.map((row, rowIdx) => (
                         <tr key={rowIdx} className="border-b border-gray-700 hover:bg-gray-700/50">
                           <td className="px-3 py-2 text-gray-500">{rowIdx + 1}</td>
-                          {fieldsForMode.map(field => {
-                            const colIdx = columnMapping[field];
-                            return (
-                              <td key={field} className="px-3 py-2 text-gray-300 max-w-xs truncate">
-                                {colIdx !== null && colIdx < row.length ? row[colIdx] : '-'}
-                              </td>
-                            );
-                          })}
+                          {row.map((cell, colIdx) => (
+                            <td key={colIdx} className="px-3 py-2 text-gray-300 max-w-xs truncate">
+                              {cell || '-'}
+                            </td>
+                          ))}
                         </tr>
                       ))}
                     </tbody>
@@ -281,9 +338,9 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
                 </div>
               </div>
 
-              <div className="mt-6 space-y-3">
+              <div className="space-y-3">
                 <label className="text-sm font-semibold text-gray-300 block">Select Account</label>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-48 overflow-y-auto">
                   {assets.map(asset => (
                     <label key={asset.id} className={`flex items-center p-3 rounded-lg cursor-pointer border transition-all ${
                       selectedAccountId === asset.id
@@ -304,7 +361,7 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
                 </div>
 
                 {showAccountCreation ? (
-                  <div className="space-y-2 p-3 bg-gray-800 rounded-lg">
+                  <div className="space-y-2 p-3 bg-gray-800 rounded-lg border border-gray-700">
                     <input
                       type="text"
                       placeholder="Account name"
@@ -346,7 +403,7 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
                 )}
               </div>
 
-              <div className="mt-6 flex gap-3">
+              <div className="flex gap-3">
                 <button
                   onClick={() => setStep('upload')}
                   className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg font-medium"
@@ -357,7 +414,7 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
                   onClick={() => {
                     const missingRequired = requiredFields.filter(f => columnMapping[f] === null);
                     if (missingRequired.length > 0) {
-                      alert(`Please map required fields: ${missingRequired.join(', ')}`);
+                      alert(`Please map required fields: ${missingRequired.map(f => getFieldLabel(f)).join(', ')}`);
                       return;
                     }
                     if (!selectedAccountId) {
@@ -375,25 +432,34 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
           )}
 
           {step === 'preview' && (
-            <div>
-              <h3 className="text-sm font-semibold text-gray-300 mb-3">Import Preview</h3>
-              <div className="bg-gray-800 rounded-lg p-4 space-y-2 max-h-96 overflow-y-auto">
-                {parseTransactions().slice(0, 10).map((tx, idx) => (
-                  <div key={idx} className="border border-gray-700 rounded p-3 text-sm text-gray-300">
-                    <div className="flex justify-between">
-                      <span className="font-medium text-white">{tx.merchant}</span>
-                      <span className={tx.type === 'income' ? 'text-green-400' : 'text-red-400'}>
-                        {tx.type === 'income' ? '+' : '-'}£{tx.amount.toFixed(2)}
-                      </span>
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-300 mb-3">Import Preview ({parseTransactions().length} transactions)</h3>
+                <div className="bg-gray-800 rounded-lg p-4 space-y-2 max-h-96 overflow-y-auto">
+                  {parseTransactions().slice(0, 10).map((tx, idx) => (
+                    <div key={idx} className="border border-gray-700 rounded p-3 text-sm text-gray-300">
+                      <div className="flex justify-between">
+                        <span className="font-medium text-white">{tx.merchant}</span>
+                        <span className={tx.type === 'income' || tx.action === 'buy' ? 'text-green-400' : 'text-red-400'}>
+                          {tx.type === 'income' ? '+' : tx.action === 'sell' ? '-' : ''}£{tx.amount.toFixed(2)}
+                        </span>
+                      </div>
+                      {mode === 'banking' && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          {tx.date} • {tx.category} • {tx.type}
+                        </div>
+                      )}
+                      {mode === 'investments' && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          {tx.date} • {tx.shares} shares @ £{tx.pricePerShare.toFixed(2)} ({tx.currencyPrice})
+                        </div>
+                      )}
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {tx.date} • {tx.category} • {tx.type}
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
 
-              <div className="mt-4 flex gap-3">
+              <div className="flex gap-3">
                 <button
                   onClick={() => setStep('mapping')}
                   className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg font-medium"

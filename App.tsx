@@ -589,12 +589,56 @@ const App: React.FC = () => {
     };
 
     const handleImportTransactions = (importedTransactions: Transaction[]) => {
+        const investingTransactions = importedTransactions.filter(tx => tx.type === 'investing');
+        const bankingTransactions = importedTransactions.filter(tx => tx.type !== 'investing');
+
         setTransactions(prev => [...prev, ...importedTransactions]);
 
-        // Calculate balance changes per account
+        // Update asset holdings for investing transactions
+        setAssets(prevAssets => prevAssets.map(asset => {
+            const investingTxs = investingTransactions.filter(tx => tx.accountId === asset.id);
+            if (investingTxs.length === 0) return asset;
+
+            const updatedAsset = { ...asset, holdings: asset.holdings ? [...asset.holdings] : [] };
+
+            investingTxs.forEach(tx => {
+                if (!updatedAsset.holdings) updatedAsset.holdings = [];
+
+                const existingHoldingIndex = updatedAsset.holdings.findIndex(h => h.ticker === tx.ticker);
+                const pricePerShare = tx.pricePerShare || (tx.total! / Math.abs(tx.shares!));
+
+                if (existingHoldingIndex > -1) {
+                    const existingHolding = updatedAsset.holdings[existingHoldingIndex];
+                    const currentShares = existingHolding.shares;
+                    const newShares = currentShares + tx.shares!;
+
+                    if (newShares > 0) {
+                        const totalCost = (existingHolding.avgCost * currentShares) + (pricePerShare * tx.shares!);
+                        existingHolding.avgCost = totalCost / newShares;
+                        existingHolding.shares = newShares;
+                    } else if (newShares < 0) {
+                        existingHolding.shares = newShares;
+                    } else {
+                        updatedAsset.holdings.splice(existingHoldingIndex, 1);
+                    }
+                } else if (tx.action === 'buy' && tx.shares! > 0) {
+                    updatedAsset.holdings.push({
+                        ticker: tx.ticker!,
+                        name: tx.name || tx.ticker!,
+                        type: 'Stock',
+                        shares: tx.shares!,
+                        avgCost: pricePerShare
+                    });
+                }
+            });
+
+            return updatedAsset;
+        }));
+
+        // Calculate balance changes per account for banking transactions
         const balanceChanges = new Map<string, number>();
 
-        importedTransactions.forEach(tx => {
+        bankingTransactions.forEach(tx => {
             if (tx.type === 'transfer' && tx.recipientAccountId) {
                 // Transfer: deduct from source, add to recipient
                 const sourceChange = balanceChanges.get(tx.accountId) || 0;
@@ -611,7 +655,7 @@ const App: React.FC = () => {
             }
         });
 
-        // Update asset balances
+        // Update asset balances for banking transactions
         setAssets(prevAssets => prevAssets.map(asset => {
             const change = balanceChanges.get(asset.id);
             if (change !== undefined) {

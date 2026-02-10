@@ -1291,12 +1291,19 @@ const Settings: React.FC<SettingsProps> = (props) => {
                 date: tx.date,
                 amount: Math.abs(tx.amount),
                 type: tx.type || 'expense',
-                accountId: resolveAccountId(tx.sourceAccount),
+                accountId: tx.type === 'investing' ? selectedAccountId : resolveAccountId(tx.sourceAccount),
                 recipientAccountId: tx.recipientAccount ? resolveAccountId(tx.recipientAccount) : undefined,
                 sourceAccountId: tx.sourceAccount ? resolveAccountId(tx.sourceAccount) : undefined,
                 ticker: tx.ticker,
                 shares: tx.shares,
                 purchasePrice: tx.purchasePrice,
+                pricePerShare: tx.pricePerShare,
+                action: tx.action,
+                name: tx.name,
+                currencyPrice: tx.currencyPrice,
+                exchangeRate: tx.exchangeRate,
+                total: tx.total,
+                currencyTotal: tx.currencyTotal,
             };
         });
 
