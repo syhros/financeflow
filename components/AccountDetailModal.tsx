@@ -14,7 +14,7 @@ interface AccountDetailModalProps {
     transactions: Transaction[];
     marketData?: MarketData;
     onUpdateTransactions?: (transactions: Transaction[]) => void;
-    onUpdateHolding?: (accountId: string, ticker: string, updates: { icon?: string; isLondonListed?: boolean }) => Promise<void>;
+    onUpdateHolding?: (accountId: string, ticker: string, updates: { icon?: string; isLondonListed?: boolean; isPennyStock?: boolean }) => Promise<void>;
 }
 
 const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose, account, accountType, transactions, marketData = {}, onUpdateTransactions, onUpdateHolding }) => {
@@ -30,8 +30,24 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
     const [editingPennyStock, setEditingPennyStock] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [holdingOverrides, setHoldingOverrides] = useState<Record<string, { isPennyStock?: boolean; isLondonListed?: boolean }>>({});
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { formatCurrency } = useCurrency();
+
+    const getEffectiveHolding = (holding: any) => {
+        const overrides = holdingOverrides[holding.ticker];
+        if (!overrides) return holding;
+        return {
+            ...holding,
+            ...overrides
+        };
+    };
+
+    const handleClose = () => {
+        setHoldingOverrides({});
+        setEditingHoldingTicker(null);
+        onClose();
+    };
 
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -54,6 +70,32 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
         setSaveMessage(null);
     };
 
+    const handlePennyStockToggle = (checked: boolean) => {
+        setEditingPennyStock(checked);
+        if (editingHoldingTicker) {
+            setHoldingOverrides(prev => ({
+                ...prev,
+                [editingHoldingTicker]: {
+                    ...prev[editingHoldingTicker],
+                    isPennyStock: checked,
+                }
+            }));
+        }
+    };
+
+    const handleLondonListedToggle = (checked: boolean) => {
+        setEditingLondonListed(checked);
+        if (editingHoldingTicker) {
+            setHoldingOverrides(prev => ({
+                ...prev,
+                [editingHoldingTicker]: {
+                    ...prev[editingHoldingTicker],
+                    isLondonListed: checked,
+                }
+            }));
+        }
+    };
+
     const handleSave = async () => {
         if (!editingHoldingTicker || !onUpdateHolding) return;
 
@@ -73,6 +115,11 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                 setSaveMessage(null);
                 setEditingHoldingTicker(null);
                 setHoldingIconUrl('');
+                setHoldingOverrides(prev => {
+                    const newOverrides = { ...prev };
+                    delete newOverrides[editingHoldingTicker];
+                    return newOverrides;
+                });
             }, 1500);
         } catch (error) {
             console.error('Failed to save holding:', error);
@@ -104,10 +151,11 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
 
         if (isInvestingAccount && 'holdings' in account && account.holdings) {
             account.holdings.forEach(holding => {
+                const effectiveHolding = getEffectiveHolding(holding);
                 const holdingMetrics = calculateHoldingMetrics(
-                    holding,
-                    getMarketPriceForTicker(holding.ticker, holding.isLondonListed || false, holding.isPennyStock || false, marketData),
-                    holding.ticker,
+                    effectiveHolding,
+                    getMarketPriceForTicker(effectiveHolding.ticker, effectiveHolding.isLondonListed || false, effectiveHolding.isPennyStock || false, marketData),
+                    effectiveHolding.ticker,
                     accountTransactions
                 );
                 totalIncome += holdingMetrics.totalPL;
@@ -134,11 +182,13 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
         return asset.holdings
             .filter(h => h.shares > 0.1)
             .sort((a, b) => {
-                const aValue = (getMarketPriceForTicker(a.ticker, a.isLondonListed || false, a.isPennyStock || false, marketData) || a.currentPrice || a.avgCost) * a.shares;
-                const bValue = (getMarketPriceForTicker(b.ticker, b.isLondonListed || false, b.isPennyStock || false, marketData) || b.currentPrice || b.avgCost) * b.shares;
+                const aEffective = getEffectiveHolding(a);
+                const bEffective = getEffectiveHolding(b);
+                const aValue = (getMarketPriceForTicker(aEffective.ticker, aEffective.isLondonListed || false, aEffective.isPennyStock || false, marketData) || aEffective.currentPrice || aEffective.avgCost) * aEffective.shares;
+                const bValue = (getMarketPriceForTicker(bEffective.ticker, bEffective.isLondonListed || false, bEffective.isPennyStock || false, marketData) || bEffective.currentPrice || bEffective.avgCost) * bEffective.shares;
                 return bValue - aValue;
             });
-    }, [asset.holdings, marketData]);
+    }, [asset.holdings, marketData, holdingOverrides]);
 
     const zeroHoldings = useMemo(() => {
         if (!asset.holdings) return [];
@@ -151,14 +201,14 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
     }, [activeHoldings, holdingsPage, holdingsPerPage]);
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4" onClick={onClose}>
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4" onClick={handleClose}>
             <div className="bg-card-bg rounded-lg shadow-xl w-full max-w-6xl border border-border-color max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-center p-6 border-b border-border-color">
                     <div>
                         <h2 className="text-2xl font-bold text-white">{account.name}</h2>
                         <p className="text-sm text-gray-400 mt-1">{account.type} Account</p>
                     </div>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+                    <button onClick={handleClose} className="text-gray-400 hover:text-white transition-colors">
                         <CloseIcon className="w-6 h-6" />
                     </button>
                 </div>
@@ -200,26 +250,27 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                 {paginatedActiveHoldings.length > 0 ? (
                                     <div className="space-y-3 max-h-[calc(90vh-400px)] overflow-y-auto pr-2">
                                         {paginatedActiveHoldings.map(holding => {
-                                            const marketPrice = getMarketPriceForTicker(holding.ticker, holding.isLondonListed || false, holding.isPennyStock || false, marketData);
+                                            const effectiveHolding = getEffectiveHolding(holding);
+                                            const marketPrice = getMarketPriceForTicker(effectiveHolding.ticker, effectiveHolding.isLondonListed || false, effectiveHolding.isPennyStock || false, marketData);
                                             const holdingMetrics = calculateHoldingMetrics(
-                                              holding,
+                                              effectiveHolding,
                                               marketPrice,
-                                              holding.ticker,
+                                              effectiveHolding.ticker,
                                               accountTransactions
                                             );
-                                            const currentValue = holdingMetrics.currentPrice * holding.shares;
+                                            const currentValue = holdingMetrics.currentPrice * effectiveHolding.shares;
 
                                             return (
-                                                <div key={holding.ticker} className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                                                <div key={effectiveHolding.ticker} className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
                                                     <div className="flex justify-between items-start mb-3">
                                                         <div className="flex items-start gap-3">
-                                                            {holding.icon && (
-                                                                <img src={holding.icon} alt={holding.name} className="w-10 h-10 rounded-lg object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                                                            {effectiveHolding.icon && (
+                                                                <img src={effectiveHolding.icon} alt={effectiveHolding.name} className="w-10 h-10 rounded-lg object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                                                             )}
                                                             <div>
-                                                                <h4 className="text-white font-bold text-lg">{holding.name}</h4>
+                                                                <h4 className="text-white font-bold text-lg">{effectiveHolding.name}</h4>
                                                                 <p className="text-gray-400 text-sm">
-                                                                    {holding.ticker}{holding.isLondonListed && <span className="text-yellow-400">.L</span>} • {holding.type}
+                                                                    {effectiveHolding.ticker}{effectiveHolding.isLondonListed && <span className="text-yellow-400">.L</span>} • {effectiveHolding.type}
                                                                 </p>
                                                             </div>
                                                         </div>
@@ -229,7 +280,7 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                                                 <p className="text-gray-400 text-xs">Current Value</p>
                                                             </div>
                                                             <button
-                                                                onClick={() => openEditModal(holding.ticker)}
+                                                                onClick={() => openEditModal(effectiveHolding.ticker)}
                                                                 className="mt-1 p-2 text-gray-400 hover:text-white hover:bg-gray-600 rounded-lg transition-colors"
                                                                 title="Edit holding"
                                                             >
@@ -240,11 +291,11 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                                     <div className="grid grid-cols-4 gap-4 pt-3 border-t border-gray-600">
                                                         <div>
                                                             <p className="text-gray-400 text-xs mb-1">Shares Held</p>
-                                                            <p className="text-white font-semibold">{holding.shares.toFixed(4)}</p>
+                                                            <p className="text-white font-semibold">{effectiveHolding.shares.toFixed(4)}</p>
                                                         </div>
                                                         <div>
                                                             <p className="text-gray-400 text-xs mb-1">Avg. Cost</p>
-                                                            <p className="text-white font-semibold">{formatCurrency(holding.avgCost)}</p>
+                                                            <p className="text-white font-semibold">{formatCurrency(effectiveHolding.avgCost)}</p>
                                                         </div>
                                                         <div>
                                                             <p className="text-gray-400 text-xs mb-1">Current Price</p>
@@ -323,27 +374,37 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                         {showZeroHoldings && (
                                             <div className="mt-3 space-y-2">
                                                 {zeroHoldings.map(holding => {
-                                                    const marketPrice = getMarketPriceForTicker(holding.ticker, holding.isLondonListed || false, holding.isPennyStock || false, marketData);
+                                                    const effectiveHolding = getEffectiveHolding(holding);
+                                                    const marketPrice = getMarketPriceForTicker(effectiveHolding.ticker, effectiveHolding.isLondonListed || false, effectiveHolding.isPennyStock || false, marketData);
                                                     const holdingMetrics = calculateHoldingMetrics(
-                                                      holding,
+                                                      effectiveHolding,
                                                       marketPrice,
-                                                      holding.ticker,
+                                                      effectiveHolding.ticker,
                                                       accountTransactions
                                                     );
-                                                    const currentValue = holdingMetrics.currentPrice * holding.shares;
+                                                    const currentValue = holdingMetrics.currentPrice * effectiveHolding.shares;
 
                                                     return (
                                                         <div key={holding.ticker} className="p-3 bg-gray-700/30 rounded-lg border border-gray-600">
-                                                            <div className="flex justify-between items-start">
-                                                                <div>
-                                                                    <h4 className="text-white font-semibold text-sm">{holding.name}</h4>
+                                                            <div className="flex justify-between items-start gap-2">
+                                                                <div className="flex-1">
+                                                                    <h4 className="text-white font-semibold text-sm">{effectiveHolding.name}</h4>
                                                                     <p className="text-gray-400 text-xs">
-                                                                        {holding.ticker}{holding.isLondonListed && <span className="text-yellow-400">.L</span>} • {holding.shares.toFixed(4)} shares • {formatCurrency(currentValue)}
+                                                                        {effectiveHolding.ticker}{effectiveHolding.isLondonListed && <span className="text-yellow-400">.L</span>} • {effectiveHolding.shares.toFixed(4)} shares • {formatCurrency(currentValue)}
                                                                     </p>
                                                                 </div>
-                                                                <p className={`text-sm font-semibold ${holdingMetrics.totalPL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                                    {holdingMetrics.totalPL >= 0 ? '+' : ''}{formatCurrency(holdingMetrics.totalPL)}
-                                                                </p>
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className={`text-sm font-semibold ${holdingMetrics.totalPL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                                        {holdingMetrics.totalPL >= 0 ? '+' : ''}{formatCurrency(holdingMetrics.totalPL)}
+                                                                    </p>
+                                                                    <button
+                                                                        onClick={() => openEditModal(effectiveHolding.ticker)}
+                                                                        className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-600 rounded-lg transition-colors"
+                                                                        title="Edit holding"
+                                                                    >
+                                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                                                    </button>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     );
@@ -491,10 +552,10 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                     <input
                                         type="checkbox"
                                         checked={editingLondonListed}
-                                        onChange={(e) => setEditingLondonListed(e.target.checked)}
-                                        className="w-5 h-5 rounded border-gray-500 text-blue-500 focus:ring-blue-500"
+                                        onChange={(e) => handleLondonListedToggle(e.target.checked)}
+                                        className="w-5 h-5 rounded border-gray-500 text-blue-500 focus:ring-blue-500 flex-shrink-0"
                                     />
-                                    <div>
+                                    <div className="flex-1">
                                         <p className="text-white font-medium">London Stock Exchange (.L)</p>
                                         <p className="text-xs text-gray-400">Append .L suffix when fetching market data (e.g. VUSA.L)</p>
                                     </div>
@@ -506,10 +567,10 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                     <input
                                         type="checkbox"
                                         checked={editingPennyStock}
-                                        onChange={(e) => setEditingPennyStock(e.target.checked)}
-                                        className="w-5 h-5 rounded border-gray-500 text-blue-500 focus:ring-blue-500"
+                                        onChange={(e) => handlePennyStockToggle(e.target.checked)}
+                                        className="w-5 h-5 rounded border-gray-500 text-blue-500 focus:ring-blue-500 flex-shrink-0"
                                     />
-                                    <div>
+                                    <div className="flex-1">
                                         <p className="text-white font-medium">Penny Stock</p>
                                         <p className="text-xs text-gray-400">Stock traded in pence (e.g. Shell RDBS.L, Evraz EVR.L). Prices divided by 100 for GBP conversion.</p>
                                     </div>
@@ -567,7 +628,16 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                             )}
                             <div className="flex gap-3">
                                 <button
-                                    onClick={() => setEditingHoldingTicker(null)}
+                                    onClick={() => {
+                                        if (editingHoldingTicker) {
+                                            setHoldingOverrides(prev => {
+                                                const newOverrides = { ...prev };
+                                                delete newOverrides[editingHoldingTicker];
+                                                return newOverrides;
+                                            });
+                                        }
+                                        setEditingHoldingTicker(null);
+                                    }}
                                     className="flex-1 py-3 bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-600 transition-colors"
                                 >
                                     Cancel
