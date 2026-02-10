@@ -177,6 +177,7 @@ export const ProfileModal: React.FC<{
     const [formData, setFormData] = useState(user);
     const [tempImageUrl, setTempImageUrl] = useState<string>('');
     const [showCropModal, setShowCropModal] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -226,9 +227,9 @@ export const ProfileModal: React.FC<{
     const labelStyles = "block text-sm font-medium text-gray-400 mb-1";
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-start pt-20" onClick={onClose}>
+        <div className={`fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-start pt-20 transition-opacity duration-300 ${isLoggingOut ? 'opacity-0' : 'opacity-100'}`} onClick={onClose}>
             <div
-                className={`bg-card-bg rounded-lg shadow-xl w-full max-w-sm border border-border-color text-white transform transition-all duration-300 ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+                className={`bg-card-bg rounded-lg shadow-xl w-full max-w-sm border border-border-color text-white transform transition-all duration-300 ${isOpen && !isLoggingOut ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex flex-col items-center p-6 border-b border-border-color">
@@ -291,10 +292,13 @@ export const ProfileModal: React.FC<{
                     </div>
                 </div>
                  <div className="p-4">
-                    <button onClick={() => {
-                        signOut();
-                    }} className="w-full py-3 bg-red-600/20 text-red-400 rounded-lg font-semibold hover:bg-red-600/40 transition-colors">
-                        Logout
+                    <button onClick={async () => {
+                        setIsLoggingOut(true);
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                        await signOut();
+                        onClose();
+                    }} disabled={isLoggingOut} className="w-full py-3 bg-red-600/20 text-red-400 rounded-lg font-semibold hover:bg-red-600/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        {isLoggingOut ? 'Logging out...' : 'Logout'}
                     </button>
                 </div>
             </div>
