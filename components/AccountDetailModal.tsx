@@ -4,6 +4,7 @@ import { CloseIcon } from './icons';
 import { format } from 'date-fns';
 import { useCurrency } from '../App';
 import { holdingsService } from '../services/database';
+import { calculateHoldingMetrics } from '../utils/investmentUtils';
 
 interface AccountDetailModalProps {
     isOpen: boolean;
@@ -121,11 +122,13 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                 {asset.holdings && asset.holdings.length > 0 ? (
                                     <div className="space-y-3">
                                         {asset.holdings.map(holding => {
-                                            const currentPrice = holding.currentPrice || marketData[holding.ticker]?.price || holding.avgCost;
-                                            const currentValue = currentPrice * holding.shares;
-                                            const totalCost = holding.avgCost * holding.shares;
-                                            const profitLoss = currentValue - totalCost;
-                                            const profitLossPercent = totalCost > 0 ? (profitLoss / totalCost) * 100 : 0;
+                                            const metrics = calculateHoldingMetrics(
+                                              holding,
+                                              marketData[holding.ticker]?.price,
+                                              holding.ticker,
+                                              accountTransactions
+                                            );
+                                            const currentValue = metrics.currentPrice * holding.shares;
 
                                             return (
                                                 <div key={holding.ticker} className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
@@ -167,13 +170,16 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                                         </div>
                                                         <div>
                                                             <p className="text-gray-400 text-xs mb-1">Current Price</p>
-                                                            <p className="text-white font-semibold">{formatCurrency(currentPrice)}</p>
+                                                            <p className="text-white font-semibold">
+                                                              {formatCurrency(metrics.currentPrice)}
+                                                              {metrics.isEstimated && <span className="text-xs text-yellow-400 ml-1">(est.)</span>}
+                                                            </p>
                                                         </div>
                                                         <div>
-                                                            <p className="text-gray-400 text-xs mb-1">P/L</p>
-                                                            <p className={`font-bold ${profitLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                                {profitLoss >= 0 ? '+' : ''}{formatCurrency(profitLoss)}
-                                                                <span className="text-xs ml-1">({profitLossPercent >= 0 ? '+' : ''}{profitLossPercent.toFixed(2)}%)</span>
+                                                            <p className="text-gray-400 text-xs mb-1">Total P/L</p>
+                                                            <p className={`font-bold ${metrics.totalPL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                                {metrics.totalPL >= 0 ? '+' : ''}{formatCurrency(metrics.totalPL)}
+                                                                <span className="text-xs ml-1">({metrics.totalPLPercent >= 0 ? '+' : ''}{metrics.totalPLPercent.toFixed(2)}%)</span>
                                                             </p>
                                                         </div>
                                                     </div>
