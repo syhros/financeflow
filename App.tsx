@@ -631,6 +631,10 @@ const App: React.FC = () => {
                     investingTxs.forEach(tx => {
                         if (!updatedAsset.holdings) updatedAsset.holdings = [];
 
+                        if (tx.action === 'dividend') {
+                            return;
+                        }
+
                         const existingHoldingIndex = updatedAsset.holdings.findIndex(h => h.ticker === tx.ticker);
                         const pricePerShare = tx.pricePerShare || (tx.total! / Math.abs(tx.shares!));
 
@@ -683,6 +687,10 @@ const App: React.FC = () => {
 
                     investingTxs.forEach(tx => {
                         if (!updatedAsset.holdings) updatedAsset.holdings = [];
+
+                        if (tx.action === 'dividend') {
+                            return;
+                        }
 
                         const existingHoldingIndex = updatedAsset.holdings.findIndex(h => h.ticker === tx.ticker);
                         const pricePerShare = tx.pricePerShare || (tx.total! / Math.abs(tx.shares!));

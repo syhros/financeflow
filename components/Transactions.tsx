@@ -308,8 +308,8 @@ const TransactionItem: React.FC<{ tx: Transaction, onEdit: (tx: Transaction) => 
                 </div>
             </div>
             <div className="flex items-center gap-4">
-                <p className={`font-bold ${tx.type === 'income' ? 'text-primary' : tx.type === 'debtpayment' ? 'text-yellow-400' : 'text-white'}`}>
-                    {tx.type === 'income' ? '+' : tx.type === 'investing' ? '' : '-'}{formatCurrency(tx.amount).replace(/[+-]/g, '')}
+                <p className={`font-bold ${tx.type === 'income' || tx.action === 'dividend' ? 'text-primary' : tx.type === 'debtpayment' ? 'text-yellow-400' : 'text-white'}`}>
+                    {tx.type === 'income' || tx.action === 'dividend' ? '+' : tx.type === 'investing' ? '' : '-'}{formatCurrency(tx.amount).replace(/[+-]/g, '')}
                 </p>
             </div>
         </div>

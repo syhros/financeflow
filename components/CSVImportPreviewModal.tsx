@@ -183,6 +183,7 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
 
   const parseTransactions = () => {
     const transactions: any[] = [];
+    const dividendsByTickerDate = new Map<string, number>();
 
     csvData.forEach((row, rowIndex) => {
       const getValue = (field: string) => {
@@ -256,27 +257,60 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
 
           const isDividend = action.toLowerCase().includes('dividend');
           const isBuy = action.toLowerCase().includes('buy');
-          const purchasePrice = isDividend ? 0 : (pricePerShare || (total / shares));
 
-          transactions.push({
-            id: `import-${rowIndex}`,
-            date,
-            action: isDividend ? 'dividend' : (isBuy ? 'buy' : 'sell'),
-            ticker,
-            name: name || ticker,
-            shares: isDividend ? 0 : (isBuy ? shares : -shares),
-            pricePerShare: purchasePrice,
-            currencyPrice,
-            exchangeRate,
-            total,
-            currencyTotal,
-            type: 'investing',
-            amount: total,
-            accountId: selectedAccountId,
-            merchant: isDividend ? `DIVIDEND ${ticker}` : `${isBuy ? 'BUY' : 'SELL'} ${shares} × ${ticker}`,
-            category: 'Investments',
-            logo: '',
-          });
+          if (isDividend) {
+            const dividendKey = `${ticker}-${date}`;
+            dividendsByTickerDate.set(dividendKey, total);
+
+            transactions.push({
+              id: `import-${rowIndex}`,
+              date,
+              action: 'dividend',
+              ticker,
+              name: name || ticker,
+              shares: 0,
+              pricePerShare: 0,
+              currencyPrice,
+              exchangeRate,
+              total,
+              currencyTotal,
+              type: 'investing',
+              amount: total,
+              accountId: selectedAccountId,
+              merchant: `DIVIDEND ${ticker}`,
+              category: 'Investments',
+              logo: '',
+            });
+          } else {
+            const dividendKey = `${ticker}-${date}`;
+            const dividendAmount = dividendsByTickerDate.get(dividendKey);
+
+            if (isBuy && dividendAmount && Math.abs(total - dividendAmount) < 0.01) {
+              return;
+            }
+
+            const purchasePrice = pricePerShare || (total / shares);
+
+            transactions.push({
+              id: `import-${rowIndex}`,
+              date,
+              action: isBuy ? 'buy' : 'sell',
+              ticker,
+              name: name || ticker,
+              shares: isBuy ? shares : -shares,
+              pricePerShare: purchasePrice,
+              currencyPrice,
+              exchangeRate,
+              total,
+              currencyTotal,
+              type: 'investing',
+              amount: total,
+              accountId: selectedAccountId,
+              merchant: `${isBuy ? 'BUY' : 'SELL'} ${shares} × ${ticker}`,
+              category: 'Investments',
+              logo: '',
+            });
+          }
         }
       } catch (error) {
         console.error(`Error parsing row ${rowIndex}:`, error);
@@ -545,8 +579,8 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
                     <div key={idx} className="border border-gray-700 rounded p-3 text-sm text-gray-300">
                       <div className="flex justify-between">
                         <span className="font-medium text-white">{tx.merchant}</span>
-                        <span className={tx.type === 'income' || tx.action === 'buy' ? 'text-green-400' : 'text-red-400'}>
-                          {tx.type === 'income' ? '+' : tx.action === 'sell' ? '-' : ''}£{tx.amount.toFixed(2)}
+                        <span className={tx.type === 'income' || tx.action === 'buy' || tx.action === 'dividend' ? 'text-green-400' : 'text-red-400'}>
+                          {tx.type === 'income' || tx.action === 'dividend' ? '+' : tx.action === 'sell' ? '-' : ''}£{tx.amount.toFixed(2)}
                         </span>
                       </div>
                       {mode === 'banking' && (
@@ -556,7 +590,7 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
                       )}
                       {mode === 'investments' && (
                         <div className="text-xs text-gray-500 mt-1">
-                          {tx.date} • {tx.shares} shares @ £{tx.pricePerShare.toFixed(2)} ({tx.currencyPrice})
+                          {tx.date} • {tx.action === 'dividend' ? '0 shares @ £0.00' : `${tx.shares} shares @ £${tx.pricePerShare.toFixed(2)}`} ({tx.currencyPrice})
                         </div>
                       )}
                     </div>
