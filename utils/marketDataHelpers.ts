@@ -8,7 +8,7 @@ export const fetchMarketDataWithLondonSuffix = async (assets: Asset[]): Promise<
     assets.forEach(asset => {
         if (asset.type === 'Investing' && asset.holdings) {
             asset.holdings.forEach(h => {
-                if (!tickerMap.hasOwnProperty(h.ticker)) {
+                if (!tickerMap.hasOwnProperty(h.ticker) && Math.abs(h.shares) > 0.1) {
                     tickerMap[h.ticker] = h.isLondonListed || false;
                     tickers.push(h.ticker);
                 }
@@ -46,4 +46,9 @@ export const getTickerToLondonFlagMap = (assets: Asset[]): Record<string, boolea
         }
     });
     return tickerMap;
+};
+
+export const getMarketPriceForTicker = (ticker: string, isLondonListed: boolean, marketData: MarketData): number | undefined => {
+    const apiTicker = isLondonListed ? `${ticker}.L` : ticker;
+    return marketData[apiTicker]?.price || marketData[ticker]?.price;
 };

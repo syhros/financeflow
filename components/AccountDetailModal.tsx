@@ -4,6 +4,7 @@ import { CloseIcon } from './icons';
 import { format } from 'date-fns';
 import { useCurrency } from '../App';
 import { calculateHoldingMetrics } from '../utils/investmentUtils';
+import { getMarketPriceForTicker } from '../utils/marketDataHelpers';
 
 interface AccountDetailModalProps {
     isOpen: boolean;
@@ -20,6 +21,9 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
     const [currentPage, setCurrentPage] = useState(1);
     const [activeTab, setActiveTab] = useState<'transactions' | 'assets'>('transactions');
     const [perPage, setPerPage] = useState(10);
+    const [holdingsPerPage, setHoldingsPerPage] = useState(10);
+    const [holdingsPage, setHoldingsPage] = useState(1);
+    const [showZeroHoldings, setShowZeroHoldings] = useState(false);
     const [editingHoldingTicker, setEditingHoldingTicker] = useState<string | null>(null);
     const [holdingIconUrl, setHoldingIconUrl] = useState('');
     const [editingLondonListed, setEditingLondonListed] = useState(false);
@@ -90,20 +94,54 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
     }, [accountTransactions, currentPage, perPage]);
 
     const metrics = useMemo(() => {
-        const totalIncome = accountTransactions
-            .filter(t => t.type === 'income')
-            .reduce((sum, t) => sum + t.amount, 0);
-
+        let totalIncome = 0;
         const totalExpenses = accountTransactions
             .filter(t => t.type === 'expense')
             .reduce((sum, t) => sum + t.amount, 0);
+
+        if (isInvestingAccount && 'holdings' in account && account.holdings) {
+            account.holdings.forEach(holding => {
+                const holdingMetrics = calculateHoldingMetrics(
+                    holding,
+                    getMarketPriceForTicker(holding.ticker, holding.isLondonListed || false, marketData),
+                    holding.ticker,
+                    accountTransactions
+                );
+                totalIncome += holdingMetrics.totalPL;
+            });
+        } else {
+            totalIncome = accountTransactions
+                .filter(t => t.type === 'income')
+                .reduce((sum, t) => sum + t.amount, 0);
+        }
 
         const netChange = accountType === 'asset'
             ? totalIncome - totalExpenses
             : totalExpenses - totalIncome;
 
         return { totalIncome, totalExpenses, netChange };
-    }, [accountTransactions, accountType]);
+    }, [accountTransactions, accountType, isInvestingAccount, account, marketData]);
+
+    const activeHoldings = useMemo(() => {
+        if (!asset.holdings) return [];
+        return asset.holdings
+            .filter(h => h.shares > 0.1)
+            .sort((a, b) => {
+                const aValue = (getMarketPriceForTicker(a.ticker, a.isLondonListed || false, marketData) || a.currentPrice || a.avgCost) * a.shares;
+                const bValue = (getMarketPriceForTicker(b.ticker, b.isLondonListed || false, marketData) || b.currentPrice || b.avgCost) * b.shares;
+                return bValue - aValue;
+            });
+    }, [asset.holdings, marketData]);
+
+    const zeroHoldings = useMemo(() => {
+        if (!asset.holdings) return [];
+        return asset.holdings.filter(h => h.shares <= 0.1);
+    }, [asset.holdings]);
+
+    const totalActivePages = Math.ceil(activeHoldings.length / holdingsPerPage);
+    const paginatedActiveHoldings = useMemo(() => {
+        return activeHoldings.slice((holdingsPage - 1) * holdingsPerPage, holdingsPage * holdingsPerPage);
+    }, [activeHoldings, holdingsPage, holdingsPerPage]);
 
     if (!isOpen) return null;
 
@@ -153,15 +191,16 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                             <div>
                                 <div className="flex justify-between items-center mb-4">
                                     <h3 className="text-lg font-semibold text-white">Holdings</h3>
-                                    <span className="text-sm text-gray-400">{asset.holdings?.length || 0} assets</span>
+                                    <span className="text-sm text-gray-400">{activeHoldings.length} active {zeroHoldings.length > 0 ? `+ ${zeroHoldings.length} closed` : ''}</span>
                                 </div>
 
-                                {asset.holdings && asset.holdings.length > 0 ? (
-                                    <div className="space-y-3">
-                                        {asset.holdings.map(holding => {
+                                {paginatedActiveHoldings.length > 0 ? (
+                                    <div className="space-y-3 max-h-[calc(90vh-400px)] overflow-y-auto pr-2">
+                                        {paginatedActiveHoldings.map(holding => {
+                                            const marketPrice = getMarketPriceForTicker(holding.ticker, holding.isLondonListed || false, marketData);
                                             const holdingMetrics = calculateHoldingMetrics(
                                               holding,
-                                              marketData[holding.ticker]?.price,
+                                              marketPrice,
                                               holding.ticker,
                                               accountTransactions
                                             );
@@ -213,7 +252,7 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                                         </div>
                                                         <div>
                                                             <p className="text-gray-400 text-xs mb-1">Total P/L</p>
-                                                            <p className={`font-bold ${holdingMetrics.totalPL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                            <p className={`font-bold text-sm ${holdingMetrics.totalPL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                                                 {holdingMetrics.totalPL >= 0 ? '+' : ''}{formatCurrency(holdingMetrics.totalPL)}
                                                                 <span className="text-xs ml-1">({holdingMetrics.totalPLPercent >= 0 ? '+' : ''}{holdingMetrics.totalPLPercent.toFixed(2)}%)</span>
                                                             </p>
@@ -225,7 +264,89 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                     </div>
                                 ) : (
                                     <div className="text-center py-12 bg-gray-700/30 rounded-lg">
-                                        <p className="text-gray-400">No holdings in this account</p>
+                                        <p className="text-gray-400">No active holdings in this account</p>
+                                    </div>
+                                )}
+
+                                {activeHoldings.length > holdingsPerPage && (
+                                    <div className="flex justify-between items-center mt-4 pt-4 border-t border-border-color">
+                                        <div className="flex items-center gap-2">
+                                            <label className="text-sm text-gray-400">Per page:</label>
+                                            <select
+                                                value={holdingsPerPage}
+                                                onChange={(e) => {
+                                                    setHoldingsPerPage(Number(e.target.value));
+                                                    setHoldingsPage(1);
+                                                }}
+                                                className="bg-gray-700 text-white rounded px-2 py-1 text-sm border border-gray-600 focus:border-primary outline-none"
+                                            >
+                                                <option value={5}>5</option>
+                                                <option value={10}>10</option>
+                                                <option value={20}>20</option>
+                                                <option value={50}>50</option>
+                                            </select>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => setHoldingsPage(p => Math.max(1, p - 1))}
+                                                disabled={holdingsPage === 1}
+                                                className="px-3 py-1 text-sm rounded bg-gray-700 text-white hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                            >
+                                                ←
+                                            </button>
+                                            <span className="text-sm text-gray-400">
+                                                Page {holdingsPage} of {totalActivePages}
+                                            </span>
+                                            <button
+                                                onClick={() => setHoldingsPage(p => Math.min(totalActivePages, p + 1))}
+                                                disabled={holdingsPage === totalActivePages}
+                                                className="px-3 py-1 text-sm rounded bg-gray-700 text-white hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                            >
+                                                →
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {zeroHoldings.length > 0 && (
+                                    <div className="mt-6 pt-6 border-t border-border-color">
+                                        <button
+                                            onClick={() => setShowZeroHoldings(!showZeroHoldings)}
+                                            className="flex items-center gap-2 text-white font-semibold hover:text-gray-300 transition-colors"
+                                        >
+                                            <svg className={`w-4 h-4 transition-transform ${showZeroHoldings ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                                            Closed Positions ({zeroHoldings.length})
+                                        </button>
+                                        {showZeroHoldings && (
+                                            <div className="mt-3 space-y-2">
+                                                {zeroHoldings.map(holding => {
+                                                    const marketPrice = getMarketPriceForTicker(holding.ticker, holding.isLondonListed || false, marketData);
+                                                    const holdingMetrics = calculateHoldingMetrics(
+                                                      holding,
+                                                      marketPrice,
+                                                      holding.ticker,
+                                                      accountTransactions
+                                                    );
+                                                    const currentValue = holdingMetrics.currentPrice * holding.shares;
+
+                                                    return (
+                                                        <div key={holding.ticker} className="p-3 bg-gray-700/30 rounded-lg border border-gray-600">
+                                                            <div className="flex justify-between items-start">
+                                                                <div>
+                                                                    <h4 className="text-white font-semibold text-sm">{holding.name}</h4>
+                                                                    <p className="text-gray-400 text-xs">
+                                                                        {holding.ticker}{holding.isLondonListed && <span className="text-yellow-400">.L</span>} • {holding.shares.toFixed(4)} shares • {formatCurrency(currentValue)}
+                                                                    </p>
+                                                                </div>
+                                                                <p className={`text-sm font-semibold ${holdingMetrics.totalPL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                                    {holdingMetrics.totalPL >= 0 ? '+' : ''}{formatCurrency(holdingMetrics.totalPL)}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -319,10 +440,12 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                 <p className={`text-3xl font-bold ${accountType === 'debt' ? 'text-red-300' : 'text-white'}`}>{formatCurrency(account.balance)}</p>
                             </div>
 
-                            <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/30">
-                                <p className="text-gray-400 text-sm mb-1">{accountType === 'debt' ? 'Total Payments' : 'Total Income'}</p>
-                                <p className="text-2xl font-bold text-green-400">+{formatCurrency(metrics.totalIncome).replace(/[+-]/g, '')}</p>
-                                <p className="text-xs text-gray-500 mt-1">{accountTransactions.filter(t => t.type === 'income').length} transactions</p>
+                            <div className={`p-4 rounded-lg border ${metrics.totalIncome >= 0 ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                                <p className="text-gray-400 text-sm mb-1">{accountType === 'debt' ? 'Total Payments' : isInvestingAccount ? 'Total P/L' : 'Total Income'}</p>
+                                <p className={`text-2xl font-bold ${metrics.totalIncome >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                    {metrics.totalIncome >= 0 ? '+' : ''}{formatCurrency(metrics.totalIncome).replace(/^[+-]/, '')}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">{isInvestingAccount ? 'All holdings' : accountTransactions.filter(t => t.type === 'income').length + ' transactions'}</p>
                             </div>
 
                             <div className="p-4 bg-red-500/10 rounded-lg border border-red-500/30">
