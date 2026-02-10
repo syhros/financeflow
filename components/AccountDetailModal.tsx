@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Asset, Debt, Transaction, MarketData } from '../types';
 import { CloseIcon } from './icons';
 import { format } from 'date-fns';
@@ -20,7 +20,20 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
     const [perPage, setPerPage] = useState(10);
     const [editingHoldingTicker, setEditingHoldingTicker] = useState<string | null>(null);
     const [holdingIconUrl, setHoldingIconUrl] = useState('');
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const { formatCurrency } = useCurrency();
+
+    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const result = e.target?.result as string;
+                setHoldingIconUrl(result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
 
     const isInvestingAccount = accountType === 'asset' && 'holdings' in account && account.type === 'Investing';
 
@@ -297,13 +310,37 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                     placeholder="e.g., https://logo.clearbit.com/apple.com"
                                     className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-primary outline-none"
                                 />
-                                {holdingIconUrl && (
-                                    <div className="mt-4 flex items-center gap-3">
-                                        <img src={holdingIconUrl} alt="preview" className="w-12 h-12 rounded-lg" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                                        <span className="text-sm text-gray-400">Preview</span>
-                                    </div>
-                                )}
                             </div>
+                            <div className="relative">
+                                <label className="block text-sm font-medium text-gray-300 mb-2">Or Upload Image</label>
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="w-full py-3 px-4 border-2 border-dashed border-gray-600 rounded-lg text-gray-300 hover:border-primary hover:text-primary transition-colors font-medium"
+                                >
+                                    Upload Image
+                                </button>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleFileUpload}
+                                    className="hidden"
+                                />
+                            </div>
+                            {holdingIconUrl && (
+                                <div className="mt-4 flex items-center gap-3 p-3 bg-gray-700/50 rounded-lg">
+                                    <img src={holdingIconUrl} alt="preview" className="w-12 h-12 rounded-lg object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                                    <span className="text-sm text-gray-300">Preview</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setHoldingIconUrl('')}
+                                        className="ml-auto text-gray-400 hover:text-red-400 transition-colors"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                </div>
+                            )}
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => setEditingHoldingTicker(null)}
