@@ -19,6 +19,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   const validatePassword = (pwd: string) => {
     const errors: string[] = [];
@@ -123,6 +124,8 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) => {
         setError(error.message);
       }
       setLoading(false);
+    } else {
+      setShowConfirmation(true);
     }
   };
 
@@ -283,6 +286,30 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) => {
           </p>
         </div>
       </div>
+
+      {showConfirmation && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center px-4 z-50">
+          <div className="bg-slate-800 rounded-2xl shadow-2xl p-8 border border-slate-700/50 max-w-sm w-full text-center">
+            <div className="mb-6">
+              <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">Account Created</h2>
+              <p className="text-slate-300 text-sm">
+                Your account has been created successfully. Please check your email to confirm your address.
+              </p>
+            </div>
+            <button
+              onClick={onSwitchToLogin}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
+            >
+              Okay
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
