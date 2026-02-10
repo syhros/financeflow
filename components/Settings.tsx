@@ -36,6 +36,7 @@ interface SettingsProps {
     onDeleteGoal: (goalId: string) => void;
     onDeleteRecurring: (paymentId: string) => void;
     onDeleteTransactions: (params: { accountId?: string; level?: string; beforeDate?: string }) => void;
+    onRefreshMarketData?: () => void;
 }
 
 const availableIcons = [
@@ -1222,7 +1223,7 @@ const ToggleSwitch: React.FC<{ enabled: boolean; onToggle: () => void }> = ({ en
 );
 
 const Settings: React.FC<SettingsProps> = (props) => {
-    const { categories, onAddCategory, onUpdateCategory, onDeleteCategory, rules, onAddRule, onUpdateRule, onDeleteRule, onWipeData, notificationsEnabled, onToggleNotifications, autoCategorize, onToggleAutoCategorize, smartSuggestions, onToggleSmartSuggestions, assets, debts, bills, goals, recurringPayments, onImportTransactions, onAddAsset, onAddDebt, onDeleteAsset, onDeleteDebt, onDeleteBill, onDeleteGoal, onDeleteRecurring, onDeleteTransactions } = props;
+    const { categories, onAddCategory, onUpdateCategory, onDeleteCategory, rules, onAddRule, onUpdateRule, onDeleteRule, onWipeData, notificationsEnabled, onToggleNotifications, autoCategorize, onToggleAutoCategorize, smartSuggestions, onToggleSmartSuggestions, assets, debts, bills, goals, recurringPayments, onImportTransactions, onAddAsset, onAddDebt, onDeleteAsset, onDeleteDebt, onDeleteBill, onDeleteGoal, onDeleteRecurring, onDeleteTransactions, onRefreshMarketData } = props;
     const [isCatModalOpen, setIsCatModalOpen] = useState(false);
     const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
     const [isWipeModalOpen, setIsWipeModalOpen] = useState(false);
@@ -1231,6 +1232,7 @@ const Settings: React.FC<SettingsProps> = (props) => {
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
     const [isImportBackupModalOpen, setIsImportBackupModalOpen] = useState(false);
+    const [isRefreshingMarketData, setIsRefreshingMarketData] = useState(false);
     const { currency, setCurrency } = useCurrency();
 
     const currencyMap: {[key in Currency]: string} = { 'GBP': 'GBP (£)', 'USD': 'USD ($)', 'EUR': 'EUR (€)' };
@@ -1357,6 +1359,21 @@ const Settings: React.FC<SettingsProps> = (props) => {
                                 </select>
                             </SettingRow>
                             <SettingRow title="Theme"><span className="text-gray-400">Dark</span></SettingRow>
+                            <SettingRow title="Refresh Market Data" onClick={async () => {
+                                setIsRefreshingMarketData(true);
+                                if (onRefreshMarketData) {
+                                    try {
+                                        await onRefreshMarketData();
+                                    } catch (error) {
+                                        console.error('Failed to refresh market data:', error);
+                                    }
+                                }
+                                setIsRefreshingMarketData(false);
+                            }}>
+                                <button disabled={isRefreshingMarketData} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-500 disabled:opacity-50 transition-colors">
+                                    {isRefreshingMarketData ? 'Refreshing...' : 'Refresh'}
+                                </button>
+                            </SettingRow>
                         </Card>
                     </div>
                      <div>

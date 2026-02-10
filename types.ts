@@ -96,12 +96,14 @@ export interface BaseAccount {
 }
 
 export interface Holding {
+    id: string;
     type: 'Stock' | 'Crypto';
     ticker: string;
     name: string;
     shares: number;
     avgCost: number;
     currentPrice?: number;
+    icon?: string;
 }
 
 export interface Asset extends BaseAccount {

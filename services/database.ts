@@ -470,6 +470,32 @@ export const notificationsService = {
   },
 };
 
+// Holdings operations
+export const holdingsService = {
+  async updateHolding(holdingId: string, updates: any) {
+    const { data, error } = await supabase
+      .from('holdings')
+      .update(updates)
+      .eq('id', holdingId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async getHoldingsByTicker(userId: string, ticker: string) {
+    const { data, error } = await supabase
+      .from('holdings')
+      .select('*')
+      .eq('ticker', ticker)
+      .eq('asset_id', (supabase.from('assets').select('id').eq('user_id', userId)));
+
+    if (error) throw error;
+    return data || [];
+  },
+};
+
 // Settings operations
 export const settingsService = {
   async getSettings(userId: string) {

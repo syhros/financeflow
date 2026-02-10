@@ -15,7 +15,7 @@ import Bills from './components/Bills';
 import Recurring from './components/Recurring';
 import Categorize from './components/Categorize';
 import { mockAssets, mockDebts, mockGoals, mockBills, mockRecurringPayments, allTransactions, mockBudgets, mockCategories, mockRules, mockUser } from './data/mockData';
-import { fetchMarketData } from './services/marketData';
+import { fetchMarketData, clearMarketDataCache } from './services/marketData';
 import { generateNotifications } from './services/notificationService';
 import { userService, assetsService, debtsService, transactionsService, goalsService, billsService, recurringPaymentsService, categoriesService, transactionRulesService, budgetService, settingsService } from './services/database';
 import { addMonths } from 'date-fns';
@@ -769,6 +769,7 @@ const App: React.FC = () => {
                     existingHolding.shares = totalShares;
                 } else {
                     investmentAccount.holdings.push({
+                        id: `holding-${Date.now()}-${Math.random()}`,
                         ticker: tx.ticker!,
                         name: marketData[tx.ticker!]?.name || tx.ticker!,
                         type: tx.category as 'Stock' | 'Crypto',
@@ -860,6 +861,23 @@ const App: React.FC = () => {
 
     // Theme Handler
     const handleToggleTheme = () => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+
+    // Market Data Refresh Handler
+    const handleRefreshMarketData = async () => {
+        const tickers = assets
+            .filter(a => a.type === 'Investing' && a.holdings)
+            .flatMap(a => a.holdings!.map(h => h.ticker));
+
+        if (tickers.length === 0) {
+            alert('No investment holdings to refresh.');
+            return;
+        }
+
+        clearMarketDataCache();
+        const newMarketData = await fetchMarketData([...new Set(tickers)]);
+        setMarketData(newMarketData);
+        alert(`Refreshed market data for ${[...new Set(tickers)].length} tickers.`);
+    };
 
     // Data Wipe Handler
     const handleWipeData = (option: string) => {
@@ -988,6 +1006,7 @@ const App: React.FC = () => {
                             onDeleteGoal={handleDeleteGoal}
                             onDeleteRecurring={handleDeleteRecurringPayment}
                             onDeleteTransactions={handleDeleteTransactions}
+                            onRefreshMarketData={handleRefreshMarketData}
                         />;
             default:
                 return <Dashboard

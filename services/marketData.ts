@@ -13,6 +13,11 @@ const CACHE_TTL = 1 * 60 * 60 * 1000; // 1 hour
 let lastApiCallTime = 0;
 const API_CALL_COOLDOWN = 1 * 60 * 60 * 1000; // 1 hour
 
+export const clearMarketDataCache = () => {
+    marketDataCache.clear();
+    lastApiCallTime = 0;
+};
+
 export const fetchMarketData = async (tickers: string[]): Promise<MarketData> => {
     if (tickers.length === 0) return {};
 

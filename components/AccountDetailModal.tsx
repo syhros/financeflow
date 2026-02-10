@@ -3,7 +3,7 @@ import { Asset, Debt, Transaction, MarketData } from '../types';
 import { CloseIcon } from './icons';
 import { format } from 'date-fns';
 import { useCurrency } from '../App';
-import { transactionsService } from '../services/database';
+import { holdingsService } from '../services/database';
 
 interface AccountDetailModalProps {
     isOpen: boolean;
@@ -128,9 +128,14 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                             return (
                                                 <div key={holding.ticker} className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
                                                     <div className="flex justify-between items-start mb-3">
-                                                        <div>
-                                                            <h4 className="text-white font-bold text-lg">{holding.name}</h4>
-                                                            <p className="text-gray-400 text-sm">{holding.ticker} • {holding.type}</p>
+                                                        <div className="flex items-start gap-3">
+                                                            {holding.icon && (
+                                                                <img src={holding.icon} alt={holding.name} className="w-10 h-10 rounded-lg object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                                                            )}
+                                                            <div>
+                                                                <h4 className="text-white font-bold text-lg">{holding.name}</h4>
+                                                                <p className="text-gray-400 text-sm">{holding.ticker} • {holding.type}</p>
+                                                            </div>
                                                         </div>
                                                         <div className="text-right flex items-start gap-3">
                                                             <div>
@@ -351,18 +356,13 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                 </button>
                                 <button
                                     onClick={async () => {
-                                        if (holdingIconUrl && editingHoldingTicker && onUpdateTransactions) {
-                                            const updatedTransactions = transactions.map(tx =>
-                                                tx.ticker === editingHoldingTicker ? { ...tx, logo: holdingIconUrl } : tx
-                                            );
-                                            onUpdateTransactions(updatedTransactions);
-
-                                            const matchingTransactions = transactions.filter(tx => tx.ticker === editingHoldingTicker);
-                                            for (const tx of matchingTransactions) {
+                                        if (holdingIconUrl && editingHoldingTicker) {
+                                            const matchingHolding = asset.holdings?.find(h => h.ticker === editingHoldingTicker);
+                                            if (matchingHolding) {
                                                 try {
-                                                    await transactionsService.updateTransaction(tx.id, { logo: holdingIconUrl });
+                                                    await holdingsService.updateHolding(matchingHolding.id, { icon: holdingIconUrl });
                                                 } catch (error) {
-                                                    console.error('Failed to save icon for transaction:', error);
+                                                    console.error('Failed to save icon for holding:', error);
                                                 }
                                             }
                                         }
