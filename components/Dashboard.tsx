@@ -550,7 +550,7 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
                             </div>
                          </div>
                          <div className="h-64">
-                            <BalanceChart data={getChartData()} chartColor={balanceType === 'assets' ? '#26c45d' : balanceType === 'debts' ? '#f59e0b' : '#3b82f6'} />
+                            <BalanceChart data={getChartData()} chartColor={balanceType === 'assets' ? '#26c45d' : balanceType === 'debts' ? '#f59e0b' : '#3b82f6'} reversed={balanceType === 'debts'} />
                          </div>
                     </Card>
                 </div>

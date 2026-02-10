@@ -311,11 +311,57 @@ export const generateDebtChartData = (transactions: Transaction[], debts: any[],
 };
 
 export const generateNetWorthChartData = (transactions: Transaction[], assets: any[], debts: any[], timeFrame: 'day' | 'week' | 'month' | 'year') => {
-    const assetData = generateAssetChartData(transactions, assets, timeFrame);
-    const debtData = generateDebtChartData(transactions, debts, timeFrame);
+    const now = new Date();
+    const data: { name: string, value: number }[] = [];
 
-    return assetData.map((assetPoint, index) => ({
-        name: assetPoint.name,
-        value: Math.round(assetPoint.value - debtData[index].value)
-    }));
+    // Calculate initial net worth (current assets - current debts)
+    const currentAssets = assets.filter((a: any) => a.status === 'Active').reduce((sum: number, a: any) => sum + a.balance, 0);
+    const currentDebts = debts.filter((d: any) => d.status === 'Active').reduce((sum: number, d: any) => sum + d.balance, 0);
+
+    const calculateNetWorthAtDate = (targetDate: Date): number => {
+        let totalIncome = 0, totalExpenses = 0;
+        transactions.forEach(tx => {
+            const txDate = new Date(tx.date);
+            if (txDate <= targetDate) {
+                if (tx.type === 'income') totalIncome += tx.amount;
+                else if (tx.type === 'expense') totalExpenses += tx.amount;
+                else if (tx.type === 'debtpayment') totalExpenses += tx.amount;
+            }
+        });
+        return currentAssets + totalIncome - totalExpenses - currentDebts;
+    };
+
+    if (timeFrame === 'day') {
+        for (let i = 6; i >= 0; i--) {
+            const date = addDays(now, -i);
+            const dayName = format(date, 'EEE');
+            const dayEnd = new Date(date);
+            dayEnd.setHours(23, 59, 59, 999);
+            const netWorth = calculateNetWorthAtDate(dayEnd);
+            data.push({ name: dayName, value: Math.round(netWorth) });
+        }
+    } else if (timeFrame === 'week') {
+        for (let i = 6; i >= 0; i--) {
+            const weekStart = addDays(now, -i * 7);
+            const weekLabel = format(weekStart, 'MMM dd');
+            const netWorth = calculateNetWorthAtDate(weekStart);
+            data.push({ name: weekLabel, value: Math.round(netWorth) });
+        }
+    } else if (timeFrame === 'month') {
+        for (let i = 5; i >= 0; i--) {
+            const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const monthName = format(monthDate, 'MMM');
+            const netWorth = calculateNetWorthAtDate(monthDate);
+            data.push({ name: monthName, value: Math.round(netWorth) });
+        }
+    } else if (timeFrame === 'year') {
+        for (let i = 5; i >= 0; i--) {
+            const yearDate = new Date(now.getFullYear() - i, 0, 1);
+            const yearName = yearDate.getFullYear().toString();
+            const netWorth = calculateNetWorthAtDate(yearDate);
+            data.push({ name: yearName, value: Math.round(netWorth) });
+        }
+    }
+
+    return data;
 };

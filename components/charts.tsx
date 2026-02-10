@@ -5,9 +5,10 @@ import { useCurrency } from '../App';
 interface BalanceChartProps {
     data: { name: string; value: number }[];
     chartColor: string;
+    reversed?: boolean;
 }
 
-export const BalanceChart: React.FC<BalanceChartProps> = ({ data, chartColor }) => {
+export const BalanceChart: React.FC<BalanceChartProps> = ({ data, chartColor, reversed = false }) => {
     const { formatCurrency } = useCurrency();
     const gradientId = `color-${chartColor.replace('#', '')}`;
 
@@ -21,7 +22,7 @@ export const BalanceChart: React.FC<BalanceChartProps> = ({ data, chartColor }) 
                     </linearGradient>
                 </defs>
                 <XAxis dataKey="name" stroke="#888" fontSize={12} tickLine={false} axisLine={false} dy={10} interval={0} />
-                <YAxis hide={true} domain={['dataMin - 1000', 'dataMax + 1000']} />
+                <YAxis hide={true} domain={['dataMin - 1000', 'dataMax + 1000']} reversed={reversed} />
                 <Tooltip
                     contentStyle={{ backgroundColor: '#101010', border: '1px solid #2D2D2D', borderRadius: '0.5rem' }}
                     labelStyle={{ color: '#9ca3af' }}
