@@ -18,6 +18,7 @@ import { mockAssets, mockDebts, mockGoals, mockBills, mockRecurringPayments, all
 import { fetchMarketData, clearMarketDataCache } from './services/marketData';
 import { generateNotifications } from './services/notificationService';
 import { userService, assetsService, debtsService, transactionsService, goalsService, billsService, recurringPaymentsService, categoriesService, transactionRulesService, budgetService, settingsService, holdingsService } from './services/database';
+import { fetchMarketDataWithLondonSuffix, getTickerToLondonFlagMap, fetchAndMapMarketData } from './utils/marketDataHelpers';
 import { addMonths } from 'date-fns';
 
 // --- Context for Currency ---
@@ -201,15 +202,7 @@ const App: React.FC = () => {
     useEffect(() => {
         const uniqueTickers: string[] = JSON.parse(investmentTickersJson);
         if (uniqueTickers.length > 0) {
-            const apiTickers = uniqueTickers.map(t => investmentTickerInfo[t] ? `${t}.L` : t);
-            fetchMarketData(apiTickers).then(data => {
-                const mapped: MarketData = {};
-                uniqueTickers.forEach((ticker, i) => {
-                    const apiTicker = apiTickers[i];
-                    if (data[apiTicker]) {
-                        mapped[ticker] = data[apiTicker];
-                    }
-                });
+            fetchAndMapMarketData(uniqueTickers, investmentTickerInfo).then(mapped => {
                 setMarketData(prev => ({ ...prev, ...mapped }));
             });
         }
@@ -261,13 +254,10 @@ const App: React.FC = () => {
             const investingAssets = assets.filter(a => a.type === 'Investing' && a.holdings && a.holdings.length > 0);
             if (investingAssets.length === 0) return;
 
-            const tickers = investingAssets.flatMap(a => a.holdings!.map(h => h.ticker));
-            const uniqueTickers = [...new Set(tickers)];
-
             try {
                 clearMarketDataCache();
-                const newMarketData = await fetchMarketData(uniqueTickers);
-                setMarketData(newMarketData);
+                const marketData = await fetchMarketDataWithLondonSuffix(investingAssets);
+                setMarketData(marketData);
             } catch (error) {
                 console.error('Failed to auto-refresh market data:', error);
             }
@@ -712,11 +702,16 @@ const App: React.FC = () => {
                 });
             };
 
-            fetchMarketData(uniqueTickers).then(marketDataResponse => {
-                setAssets(prevAssets => updateHoldingsFromTxs(prevAssets, marketDataResponse));
-            }).catch(err => {
-                console.error('Failed to fetch market data:', err);
-                setAssets(prevAssets => updateHoldingsFromTxs(prevAssets));
+            setAssets(prevAssets => {
+                const tickerMap = getTickerToLondonFlagMap(prevAssets);
+                fetchAndMapMarketData(uniqueTickers, tickerMap).then(mapped => {
+                    setAssets(prevAssets => updateHoldingsFromTxs(prevAssets, mapped));
+                }).catch(err => {
+                    console.error('Failed to fetch market data:', err);
+                    setAssets(prevAssets => updateHoldingsFromTxs(prevAssets));
+                });
+
+                return prevAssets;
             });
         }
 
@@ -922,19 +917,17 @@ const App: React.FC = () => {
 
     // Market Data Refresh Handler
     const handleRefreshMarketData = async () => {
-        const tickers = assets
-            .filter(a => a.type === 'Investing' && a.holdings)
-            .flatMap(a => a.holdings!.map(h => h.ticker));
+        const investingAssets = assets.filter(a => a.type === 'Investing' && a.holdings && a.holdings.length > 0);
 
-        if (tickers.length === 0) {
+        if (investingAssets.length === 0) {
             alert('No investment holdings to refresh.');
             return;
         }
 
         clearMarketDataCache();
-        const newMarketData = await fetchMarketData([...new Set(tickers)]);
-        setMarketData(newMarketData);
-        alert(`Refreshed market data for ${[...new Set(tickers)].length} tickers.`);
+        const marketData = await fetchMarketDataWithLondonSuffix(investingAssets);
+        setMarketData(marketData);
+        alert(`Refreshed market data for ${Object.keys(marketData).length} tickers.`);
     };
 
     // Data Wipe Handler

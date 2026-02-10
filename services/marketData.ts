@@ -2,7 +2,7 @@ import { MarketData } from '../types';
 
 // API key is now safely stored in environment variables
 const API_KEY = import.meta.env.VITE_MARKET_DATA_API_KEY;
-const BASE_URL = 'https://financialmodelingprep.com/api/v3';
+const BASE_URL = 'https://financialmodelingprep.com/stable';
 
 // Global flag to ensure the warning is logged only once
 let hasWarnedAboutApiKey = false;
@@ -75,49 +75,51 @@ export const fetchMarketData = async (tickers: string[]): Promise<MarketData> =>
 
     // API Fetching Logic with retry
     const uniqueTickers = [...new Set(tickers)];
-    const url = `${BASE_URL}/quote/${uniqueTickers.join(',')}?apikey=${API_KEY}`;
+    const marketData: MarketData = {};
 
     let retries = 3;
-    while (retries > 0) {
-        try {
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`API request failed with status ${response.status}`);
-            }
-            const data = await response.json();
+    let successCount = 0;
 
-            if (!Array.isArray(data)) {
-                throw new Error('Invalid API response format');
-            }
+    for (const ticker of uniqueTickers) {
+        retries = 3;
+        while (retries > 0) {
+            try {
+                const url = `${BASE_URL}/profile?symbol=${ticker}&apikey=${API_KEY}`;
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`API request failed with status ${response.status}`);
+                }
+                const data = await response.json();
 
-            const marketData: MarketData = {};
-            data.forEach((item: any) => {
+                if (!Array.isArray(data) || data.length === 0) {
+                    throw new Error('Invalid API response format');
+                }
+
+                const item = data[0];
                 if (item?.symbol && typeof item.price === 'number') {
                     marketData[item.symbol] = {
                         price: item.price,
-                        name: item.name || item.symbol,
+                        name: item.companyName || item.name || item.symbol,
                     };
+                    successCount++;
                 }
-            });
-
-            // Update last API call time and cache successful response
-            lastApiCallTime = Date.now();
-            marketDataCache.set(cacheKey, { data: marketData, timestamp: Date.now() });
-            return marketData;
-        } catch (error) {
-            retries--;
-            console.error(`Error fetching market data (${retries} retries left):`, error);
-            if (retries === 0) {
-                // Fallback to cached data or empty object after all retries
-                if (cached) {
-                    return cached.data;
+                break;
+            } catch (error) {
+                retries--;
+                if (retries === 0) {
+                    console.error(`Failed to fetch market data for ${ticker}:`, error);
+                } else {
+                    console.warn(`Retrying ${ticker} (${retries} retries left):`, error);
+                    await new Promise((resolve) => setTimeout(resolve, (3 - retries) * 500));
                 }
-                return {};
             }
-            // Wait before retrying (exponential backoff)
-            await new Promise((resolve) => setTimeout(resolve, (3 - retries) * 1000));
         }
     }
 
-    return {};
+    if (successCount > 0) {
+        lastApiCallTime = Date.now();
+        marketDataCache.set(cacheKey, { data: marketData, timestamp: Date.now() });
+    }
+
+    return marketData;
 };
