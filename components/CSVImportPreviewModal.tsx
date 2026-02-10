@@ -24,6 +24,7 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
   const [showAccountCreation, setShowAccountCreation] = useState(false);
   const [newAccountName, setNewAccountName] = useState('');
   const [newAccountType, setNewAccountType] = useState<'Checking' | 'Savings' | 'Investing'>('Checking');
+  const [createdAccounts, setCreatedAccounts] = useState<Array<{ id: string; name: string; type: string }>>([]);
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -60,7 +61,7 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
       const text = e.target?.result as string;
       const lines = text.trim().split('\n');
       const headers = lines[0].split(',').map(h => h.trim());
-      const rows = lines.slice(1, 11).map(line => {
+      const rows = lines.slice(1).map(line => {
         const cells: string[] = [];
         let current = '';
         let inQuotes = false;
@@ -77,7 +78,7 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
         }
         cells.push(current.trim());
         return cells;
-      });
+      }).filter(row => row.some(cell => cell)); // Filter out empty rows
 
       setCsvHeaders(headers);
       setCsvData(rows);
@@ -109,7 +110,9 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
 
   const handleCreateAccount = () => {
     if (!newAccountName.trim()) return;
-    setSelectedAccountId(`new:${newAccountName}:${newAccountType}`);
+    const accountId = `new:${newAccountName}:${newAccountType}`;
+    setCreatedAccounts(prev => [...prev, { id: accountId, name: newAccountName, type: newAccountType }]);
+    setSelectedAccountId(accountId);
     setShowAccountCreation(false);
     setNewAccountName('');
   };
@@ -214,17 +217,24 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
       return;
     }
     onImport(transactions, selectedAccountId);
+    handleClose();
+  };
+
+  const handleClose = () => {
+    setCreatedAccounts([]);
+    setSelectedAccountId('');
+    setStep('upload');
     onClose();
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" onClick={handleClose}>
       <div className="bg-card-bg rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-y-auto border border-border-color" onClick={e => e.stopPropagation()}>
         <div className="sticky top-0 flex justify-between items-center p-4 border-b border-border-color bg-card-bg z-10">
           <h2 className="text-xl font-bold text-white">Import CSV Data</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">✕</button>
+          <button onClick={handleClose} className="text-gray-400 hover:text-white">✕</button>
         </div>
 
         <div className="p-6 space-y-6">
@@ -309,7 +319,7 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-gray-300 mb-3">CSV Preview</h3>
+                <h3 className="text-sm font-semibold text-gray-300 mb-3">CSV Preview (first 10 rows of {csvData.length} total)</h3>
                 <div className="overflow-x-auto bg-gray-800 rounded-lg border border-gray-700">
                   <table className="w-full text-xs">
                     <thead>
@@ -323,7 +333,7 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
                       </tr>
                     </thead>
                     <tbody>
-                      {csvData.map((row, rowIdx) => (
+                      {csvData.slice(0, 10).map((row, rowIdx) => (
                         <tr key={rowIdx} className="border-b border-gray-700 hover:bg-gray-700/50">
                           <td className="px-3 py-2 text-gray-500">{rowIdx + 1}</td>
                           {row.map((cell, colIdx) => (
@@ -356,6 +366,23 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
                         className="h-4 w-4"
                       />
                       <span className="ml-3 text-white">{asset.name} ({asset.type})</span>
+                    </label>
+                  ))}
+                  {createdAccounts.map(account => (
+                    <label key={account.id} className={`flex items-center p-3 rounded-lg cursor-pointer border transition-all ${
+                      selectedAccountId === account.id
+                        ? 'border-blue-500 bg-blue-500/10'
+                        : 'border-green-700 bg-green-900/20 hover:bg-green-900/30'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="account"
+                        value={account.id}
+                        checked={selectedAccountId === account.id}
+                        onChange={() => setSelectedAccountId(account.id)}
+                        className="h-4 w-4"
+                      />
+                      <span className="ml-3 text-white">{account.name} ({account.type}) - <span className="text-green-400 text-sm">new</span></span>
                     </label>
                   ))}
                 </div>
