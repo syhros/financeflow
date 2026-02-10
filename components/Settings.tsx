@@ -1240,49 +1240,48 @@ const Settings: React.FC<SettingsProps> = (props) => {
     const handleCSVImport = (importedData: any[], selectedAccountId: string) => {
         const allAccounts = [...assets, ...debts];
         const accountNameToId = new Map(allAccounts.map(a => [a.name.toLowerCase(), a.id!]));
+        let finalAccountId = selectedAccountId;
+
+        if (selectedAccountId.startsWith('new:')) {
+            const [, name, type] = selectedAccountId.split(':');
+            const isDebtType = type === 'Credit Card' || type === 'Loan';
+
+            if (isDebtType) {
+                onAddDebt({
+                    accountType: 'debt',
+                    name,
+                    type,
+                    balance: 0,
+                    interestRate: 0,
+                    minPayment: 0,
+                    originalBalance: 0,
+                    status: 'Active',
+                    lastUpdated: 'just now',
+                    icon: type === 'Credit Card' ? 'CreditCardIcon' : 'LoanIcon',
+                    color: 'bg-gray-700'
+                });
+            } else {
+                onAddAsset({
+                    accountType: 'asset',
+                    name,
+                    type,
+                    balance: 0,
+                    interestRate: 0,
+                    status: 'Active',
+                    lastUpdated: 'just now',
+                    icon: 'AccountsIcon',
+                    color: 'bg-green-500',
+                    holdings: []
+                });
+            }
+            finalAccountId = selectedAccountId;
+        }
 
         const transactions: Transaction[] = importedData.map((tx, i) => {
-            let accountId = selectedAccountId;
-
-            if (selectedAccountId.startsWith('new:')) {
-                const [, name, type] = selectedAccountId.split(':');
-                const isDebtType = type === 'Credit Card' || type === 'Loan';
-
-                if (isDebtType) {
-                    onAddDebt({
-                        accountType: 'debt',
-                        name,
-                        type,
-                        balance: 0,
-                        interestRate: 0,
-                        minPayment: 0,
-                        originalBalance: 0,
-                        status: 'Active',
-                        lastUpdated: 'just now',
-                        icon: type === 'Credit Card' ? 'CreditCardIcon' : 'LoanIcon',
-                        color: 'bg-gray-700'
-                    });
-                } else {
-                    onAddAsset({
-                        accountType: 'asset',
-                        name,
-                        type,
-                        balance: 0,
-                        interestRate: 0,
-                        status: 'Active',
-                        lastUpdated: 'just now',
-                        icon: 'AccountsIcon',
-                        color: 'bg-green-500',
-                        holdings: []
-                    });
-                }
-                accountId = selectedAccountId;
-            }
-
             const resolveAccountId = (accountName?: string) => {
-                if (!accountName) return accountId;
+                if (!accountName) return finalAccountId;
                 const resolved = accountNameToId.get(accountName.toLowerCase());
-                return resolved || accountId;
+                return resolved || finalAccountId;
             };
 
             return {
@@ -1293,7 +1292,7 @@ const Settings: React.FC<SettingsProps> = (props) => {
                 date: tx.date,
                 amount: Math.abs(tx.amount),
                 type: tx.type || 'expense',
-                accountId: tx.type === 'investing' ? selectedAccountId : resolveAccountId(tx.sourceAccount),
+                accountId: tx.type === 'investing' ? finalAccountId : resolveAccountId(tx.sourceAccount),
                 recipientAccountId: tx.recipientAccount ? resolveAccountId(tx.recipientAccount) : undefined,
                 sourceAccountId: tx.sourceAccount ? resolveAccountId(tx.sourceAccount) : undefined,
                 ticker: tx.ticker,
@@ -1320,7 +1319,14 @@ const Settings: React.FC<SettingsProps> = (props) => {
             <WipeDataModal isOpen={isWipeModalOpen} onClose={() => setIsWipeModalOpen(false)} onWipe={onWipeData} />
             <CustomDataDeletionModal isOpen={isCustomDeletionModalOpen} onClose={() => setIsCustomDeletionModalOpen(false)} assets={assets} debts={debts} bills={bills} goals={goals} recurringPayments={recurringPayments} onDeleteAccount={(id) => { const asset = assets.find(a => a.id === id); const debt = debts.find(d => d.id === id); if (asset) onDeleteAsset(id); else if (debt) onDeleteDebt(id); }} onDeleteBill={onDeleteBill} onDeleteGoal={onDeleteGoal} onDeleteRecurring={onDeleteRecurring} onDeleteTransactions={onDeleteTransactions} />
             <ExportDataModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} assets={assets} debts={debts} />
-            <CSVImportPreviewModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onImport={handleCSVImport} assets={assets} />
+            <CSVImportPreviewModal
+              isOpen={isImportModalOpen}
+              onClose={() => setIsImportModalOpen(false)}
+              onImport={handleCSVImport}
+              assets={assets}
+              onCreateAsset={onAddAsset}
+              onCreateDebt={onAddDebt}
+            />
             <BackupDataModal isOpen={isBackupModalOpen} onClose={() => setIsBackupModalOpen(false)} />
             <ImportBackupModal isOpen={isImportBackupModalOpen} onClose={() => setIsImportBackupModalOpen(false)} onImportComplete={() => setIsImportBackupModalOpen(false)} />
 

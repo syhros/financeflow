@@ -218,6 +218,26 @@ const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [marketData]);
 
+    useEffect(() => {
+        const interval = setInterval(async () => {
+            const investingAssets = assets.filter(a => a.type === 'Investing' && a.holdings && a.holdings.length > 0);
+            if (investingAssets.length === 0) return;
+
+            const tickers = investingAssets.flatMap(a => a.holdings!.map(h => h.ticker));
+            const uniqueTickers = [...new Set(tickers)];
+
+            try {
+                clearMarketDataCache();
+                const newMarketData = await fetchMarketData(uniqueTickers);
+                setMarketData(newMarketData);
+            } catch (error) {
+                console.error('Failed to auto-refresh market data:', error);
+            }
+        }, 60 * 60 * 1000);
+
+        return () => clearInterval(interval);
+    }, [assets]);
+
     const navigateTo = useCallback((page: Page) => {
         setCurrentPage(page);
     }, []);

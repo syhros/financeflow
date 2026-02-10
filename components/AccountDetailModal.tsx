@@ -21,6 +21,8 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
     const [perPage, setPerPage] = useState(10);
     const [editingHoldingTicker, setEditingHoldingTicker] = useState<string | null>(null);
     const [holdingIconUrl, setHoldingIconUrl] = useState('');
+    const [isSavingIcon, setIsSavingIcon] = useState(false);
+    const [iconSaveMessage, setIconSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { formatCurrency } = useCurrency();
 
@@ -154,7 +156,7 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                                             </button>
                                                         </div>
                                                     </div>
-                                                    <div className="grid grid-cols-3 gap-4 pt-3 border-t border-gray-600">
+                                                    <div className="grid grid-cols-4 gap-4 pt-3 border-t border-gray-600">
                                                         <div>
                                                             <p className="text-gray-400 text-xs mb-1">Shares Held</p>
                                                             <p className="text-white font-semibold">{holding.shares.toFixed(4)}</p>
@@ -162,6 +164,10 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                                         <div>
                                                             <p className="text-gray-400 text-xs mb-1">Avg. Cost</p>
                                                             <p className="text-white font-semibold">{formatCurrency(holding.avgCost)}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-gray-400 text-xs mb-1">Current Price</p>
+                                                            <p className="text-white font-semibold">{formatCurrency(currentPrice)}</p>
                                                         </div>
                                                         <div>
                                                             <p className="text-gray-400 text-xs mb-1">P/L</p>
@@ -347,6 +353,15 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                     </button>
                                 </div>
                             )}
+                            {iconSaveMessage && (
+                                <div className={`mt-3 p-3 rounded-lg text-sm font-medium ${
+                                    iconSaveMessage.type === 'success'
+                                        ? 'bg-green-500/20 text-green-400 border border-green-500/50'
+                                        : 'bg-red-500/20 text-red-400 border border-red-500/50'
+                                }`}>
+                                    {iconSaveMessage.text}
+                                </div>
+                            )}
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => setEditingHoldingTicker(null)}
@@ -356,23 +371,42 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                 </button>
                                 <button
                                     onClick={async () => {
-                                        if (holdingIconUrl && editingHoldingTicker) {
-                                            const matchingHolding = asset.holdings?.find(h => h.ticker === editingHoldingTicker);
-                                            if (matchingHolding) {
-                                                try {
-                                                    await holdingsService.updateHolding(matchingHolding.id, { icon: holdingIconUrl });
-                                                } catch (error) {
-                                                    console.error('Failed to save icon for holding:', error);
-                                                }
-                                            }
+                                        if (!holdingIconUrl || !editingHoldingTicker) return;
+
+                                        const matchingHolding = asset.holdings?.find(h => h.ticker === editingHoldingTicker);
+                                        if (!matchingHolding) {
+                                            setIconSaveMessage({ type: 'error', text: 'Holding not found' });
+                                            setTimeout(() => setIconSaveMessage(null), 3000);
+                                            return;
                                         }
-                                        setEditingHoldingTicker(null);
-                                        setHoldingIconUrl('');
+
+                                        if (!matchingHolding.id) {
+                                            setIconSaveMessage({ type: 'error', text: 'Cannot save: holding ID missing. Please refresh the page.' });
+                                            setTimeout(() => setIconSaveMessage(null), 4000);
+                                            return;
+                                        }
+
+                                        setIsSavingIcon(true);
+                                        try {
+                                            await holdingsService.updateHolding(matchingHolding.id, { icon: holdingIconUrl });
+                                            setIconSaveMessage({ type: 'success', text: 'Icon saved successfully!' });
+                                            setTimeout(() => {
+                                                setIconSaveMessage(null);
+                                                setEditingHoldingTicker(null);
+                                                setHoldingIconUrl('');
+                                            }, 1500);
+                                        } catch (error) {
+                                            console.error('Failed to save icon for holding:', error);
+                                            setIconSaveMessage({ type: 'error', text: 'Failed to save icon. Please try again.' });
+                                            setTimeout(() => setIconSaveMessage(null), 3000);
+                                        } finally {
+                                            setIsSavingIcon(false);
+                                        }
                                     }}
-                                    className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-500 transition-colors"
-                                    disabled={!holdingIconUrl}
+                                    className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled={!holdingIconUrl || isSavingIcon}
                                 >
-                                    Save Icon
+                                    {isSavingIcon ? 'Saving...' : 'Save Icon'}
                                 </button>
                             </div>
                         </div>

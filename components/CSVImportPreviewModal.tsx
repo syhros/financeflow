@@ -6,16 +6,18 @@ interface CSVImportPreviewModalProps {
   onClose: () => void;
   onImport: (transactions: any[], selectedAccountId: string) => void;
   assets: Asset[];
+  onCreateAsset?: (asset: any) => Promise<{ id: string; [key: string]: any }>;
+  onCreateDebt?: (debt: any) => Promise<{ id: string; [key: string]: any }>;
 }
 
 interface ColumnMapping {
   [key: string]: number | null;
 }
 
-const BANKING_FIELDS = ['date', 'merchant', 'category', 'amount', 'source_account', 'recipient_account', 'logo'];
+const BANKING_FIELDS = ['date', 'merchant', 'category', 'amount', 'debit_amount', 'credit_amount', 'source_account', 'recipient_account', 'logo'];
 const INVESTMENT_FIELDS = ['date', 'action', 'ticker', 'name', 'shares', 'price_per_share', 'currency_price', 'exchange_rate', 'total', 'currency_total'];
 
-const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, onClose, onImport, assets }) => {
+const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, onClose, onImport, assets, onCreateAsset, onCreateDebt }) => {
   const [mode, setMode] = useState<'banking' | 'investments'>('banking');
   const [csvData, setCsvData] = useState<string[][]>([]);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
@@ -26,11 +28,12 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
   const [newAccountType, setNewAccountType] = useState<'Checking' | 'Savings' | 'Investing'>('Checking');
   const [createdAccounts, setCreatedAccounts] = useState<Array<{ id: string; name: string; type: string }>>([]);
   const [step, setStep] = useState<'upload' | 'mapping' | 'preview'>('upload');
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fieldsForMode = mode === 'banking' ? BANKING_FIELDS : INVESTMENT_FIELDS;
   const requiredFields = mode === 'banking'
-    ? ['date', 'amount', 'source_account']
+    ? ['date', 'amount']
     : ['date', 'action', 'ticker', 'shares', 'total'];
 
   const getFieldLabel = (field: string) => {
@@ -40,6 +43,8 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
       merchant: 'Merchant',
       category: 'Category',
       amount: 'Amount',
+      debit_amount: 'Debit Amount',
+      credit_amount: 'Credit Amount',
       source_account: 'Source Account',
       recipient_account: 'Recipient Account',
       logo: 'Logo',
@@ -108,13 +113,64 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
     }
   };
 
-  const handleCreateAccount = () => {
+  const handleCreateAccount = async () => {
     if (!newAccountName.trim()) return;
-    const accountId = `new:${newAccountName}:${newAccountType}`;
-    setCreatedAccounts(prev => [...prev, { id: accountId, name: newAccountName, type: newAccountType }]);
-    setSelectedAccountId(accountId);
-    setShowAccountCreation(false);
-    setNewAccountName('');
+
+    setIsCreatingAccount(true);
+    try {
+      const isDebtType = newAccountType === 'Credit Card' || newAccountType === 'Loan';
+      const accountData = {
+        name: newAccountName,
+        type: newAccountType,
+        balance: 0,
+        status: 'Active' as const,
+        lastUpdated: 'just now',
+        accountType: isDebtType ? 'debt' : 'asset',
+        icon: newAccountType === 'Credit Card' ? 'CreditCardIcon' : newAccountType === 'Loan' ? 'LoanIcon' : 'AccountsIcon',
+        color: isDebtType ? 'bg-gray-700' : 'bg-green-500',
+        ...(isDebtType && {
+          interestRate: 0,
+          minPayment: 0,
+          originalBalance: 0,
+        }),
+        ...(!isDebtType && {
+          interestRate: 0,
+          holdings: [],
+        }),
+      };
+
+      let createdAccount: any;
+      if (isDebtType && onCreateDebt) {
+        try {
+          createdAccount = await onCreateDebt(accountData);
+        } catch (e) {
+          console.warn('Async callback failed, using temporary ID:', e);
+          const tempId = `new:${newAccountName}:${newAccountType}`;
+          createdAccount = { id: tempId, name: newAccountName, type: newAccountType };
+        }
+      } else if (!isDebtType && onCreateAsset) {
+        try {
+          createdAccount = await onCreateAsset(accountData);
+        } catch (e) {
+          console.warn('Async callback failed, using temporary ID:', e);
+          const tempId = `new:${newAccountName}:${newAccountType}`;
+          createdAccount = { id: tempId, name: newAccountName, type: newAccountType };
+        }
+      } else {
+        const tempId = `new:${newAccountName}:${newAccountType}`;
+        createdAccount = { id: tempId, name: newAccountName, type: newAccountType };
+      }
+
+      setCreatedAccounts(prev => [...prev, { id: createdAccount.id, name: newAccountName, type: newAccountType }]);
+      setSelectedAccountId(createdAccount.id);
+      setShowAccountCreation(false);
+      setNewAccountName('');
+    } catch (error) {
+      console.error('Failed to create account:', error);
+      alert('Failed to create account. Please try again.');
+    } finally {
+      setIsCreatingAccount(false);
+    }
   };
 
   const getColumnDisplay = (columnIndex: number) => {
@@ -139,18 +195,37 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
           const date = getValue('date');
           const merchant = getValue('merchant') || 'Transfer';
           const category = getValue('category') || 'Uncategorized';
+          const debitAmount = parseFloat(getValue('debit_amount') || '0');
+          const creditAmount = parseFloat(getValue('credit_amount') || '0');
           const amount = parseFloat(getValue('amount') || '0');
           const sourceAccount = getValue('source_account');
           const recipientAccount = getValue('recipient_account');
           const logo = getValue('logo') || '';
 
-          if (!date || !amount) return;
+          if (!date) return;
 
-          let type: 'income' | 'expense' | 'transfer' = 'expense';
+          let finalAmount = amount;
+          let finalType: 'income' | 'expense' | 'transfer' = 'expense';
+
+          if (debitAmount > 0 || creditAmount > 0) {
+            if (debitAmount > 0 && creditAmount > 0) {
+              finalType = 'transfer';
+              finalAmount = Math.max(debitAmount, creditAmount);
+            } else if (creditAmount > 0) {
+              finalType = 'income';
+              finalAmount = creditAmount;
+            } else {
+              finalType = 'expense';
+              finalAmount = debitAmount;
+            }
+          } else if (!finalAmount) {
+            return;
+          }
+
           if (sourceAccount && recipientAccount) {
-            type = 'transfer';
+            finalType = 'transfer';
           } else if (!sourceAccount && recipientAccount) {
-            type = 'income';
+            finalType = 'income';
           }
 
           transactions.push({
@@ -158,8 +233,8 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
             date,
             merchant,
             category,
-            amount: Math.abs(amount),
-            type,
+            amount: Math.abs(finalAmount),
+            type: finalType,
             logo,
             sourceAccount: sourceAccount || undefined,
             recipientAccount: recipientAccount || undefined,
@@ -409,13 +484,15 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
                     <div className="flex gap-2">
                       <button
                         onClick={handleCreateAccount}
-                        className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded text-sm font-medium"
+                        disabled={isCreatingAccount}
+                        className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        Create
+                        {isCreatingAccount ? 'Creating...' : 'Create'}
                       </button>
                       <button
                         onClick={() => setShowAccountCreation(false)}
-                        className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded text-sm font-medium"
+                        disabled={isCreatingAccount}
+                        className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Cancel
                       </button>
