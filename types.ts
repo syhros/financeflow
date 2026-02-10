@@ -104,6 +104,7 @@ export interface Holding {
     avgCost: number;
     currentPrice?: number;
     icon?: string;
+    isLondonListed?: boolean;
 }
 
 export interface Asset extends BaseAccount {

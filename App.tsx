@@ -17,7 +17,7 @@ import Categorize from './components/Categorize';
 import { mockAssets, mockDebts, mockGoals, mockBills, mockRecurringPayments, allTransactions, mockBudgets, mockCategories, mockRules, mockUser } from './data/mockData';
 import { fetchMarketData, clearMarketDataCache } from './services/marketData';
 import { generateNotifications } from './services/notificationService';
-import { userService, assetsService, debtsService, transactionsService, goalsService, billsService, recurringPaymentsService, categoriesService, transactionRulesService, budgetService, settingsService } from './services/database';
+import { userService, assetsService, debtsService, transactionsService, goalsService, billsService, recurringPaymentsService, categoriesService, transactionRulesService, budgetService, settingsService, holdingsService } from './services/database';
 import { addMonths } from 'date-fns';
 
 // --- Context for Currency ---
@@ -124,7 +124,28 @@ const App: React.FC = () => {
                     });
                 }
 
-                if (userAssets && userAssets.length > 0) setAssets(userAssets);
+                if (userAssets && userAssets.length > 0) {
+                    const assetsWithMetadata = await Promise.all(userAssets.map(async (asset: any) => {
+                        if (asset.type === 'Investing' && asset.holdings && asset.holdings.length > 0) {
+                            const metadata = await holdingsService.getHoldingsMetadata(asset.id);
+                            const metadataMap = new Map(metadata.map((m: any) => [m.ticker, m]));
+                            return {
+                                ...asset,
+                                holdings: asset.holdings.map((h: any) => {
+                                    const meta = metadataMap.get(h.ticker);
+                                    return {
+                                        ...h,
+                                        id: meta?.id || h.id,
+                                        icon: meta?.icon || h.icon,
+                                        isLondonListed: meta?.is_london_listed || false,
+                                    };
+                                })
+                            };
+                        }
+                        return asset;
+                    }));
+                    setAssets(assetsWithMetadata);
+                }
                 if (userDebts && userDebts.length > 0) setDebts(userDebts);
                 if (userTransactions && userTransactions.length > 0) setTransactions(userTransactions);
                 if (userGoals && userGoals.length > 0) setGoals(userGoals);
@@ -162,20 +183,37 @@ const App: React.FC = () => {
     }, [currency]);
 
     // Memoize tickers to prevent unnecessary API calls
-    const investmentTickersJson = useMemo(() => {
-        const tickers = assets
+    const investmentTickerInfo = useMemo(() => {
+        const tickerMap: Record<string, boolean> = {};
+        assets
             .filter(a => a.type === 'Investing' && a.holdings)
-            .flatMap(a => a.holdings!.map(h => h.ticker));
-        return JSON.stringify([...new Set(tickers)].sort());
+            .forEach(a => a.holdings!.forEach(h => {
+                tickerMap[h.ticker] = h.isLondonListed || false;
+            }));
+        return tickerMap;
     }, [assets]);
-    
+
+    const investmentTickersJson = useMemo(() => {
+        return JSON.stringify(Object.keys(investmentTickerInfo).sort());
+    }, [investmentTickerInfo]);
+
     // Fetch market data only when tickers change
     useEffect(() => {
-        const uniqueTickers = JSON.parse(investmentTickersJson);
+        const uniqueTickers: string[] = JSON.parse(investmentTickersJson);
         if (uniqueTickers.length > 0) {
-            fetchMarketData(uniqueTickers).then(setMarketData);
+            const apiTickers = uniqueTickers.map(t => investmentTickerInfo[t] ? `${t}.L` : t);
+            fetchMarketData(apiTickers).then(data => {
+                const mapped: MarketData = {};
+                uniqueTickers.forEach((ticker, i) => {
+                    const apiTicker = apiTickers[i];
+                    if (data[apiTicker]) {
+                        mapped[ticker] = data[apiTicker];
+                    }
+                });
+                setMarketData(prev => ({ ...prev, ...mapped }));
+            });
         }
-    }, [investmentTickersJson]);
+    }, [investmentTickersJson, investmentTickerInfo]);
 
     // Notification Generation
     useEffect(() => {
@@ -619,9 +657,8 @@ const App: React.FC = () => {
 
         // Fetch current market data for all tickers
         if (uniqueTickers.length > 0) {
-            fetchMarketData(uniqueTickers).then(marketDataResponse => {
-                // Update asset holdings and calculate portfolio balance
-                setAssets(prevAssets => prevAssets.map(asset => {
+            const updateHoldingsFromTxs = (prevAssets: Asset[], marketDataResponse?: MarketData) => {
+                return prevAssets.map(asset => {
                     const investingTxs = investingTransactions.filter(tx => tx.accountId === asset.id);
                     if (investingTxs.length === 0) return asset;
 
@@ -630,10 +667,7 @@ const App: React.FC = () => {
 
                     investingTxs.forEach(tx => {
                         if (!updatedAsset.holdings) updatedAsset.holdings = [];
-
-                        if (tx.action === 'dividend') {
-                            return;
-                        }
+                        if (tx.action === 'dividend') return;
 
                         const existingHoldingIndex = updatedAsset.holdings.findIndex(h => h.ticker === tx.ticker);
                         const pricePerShare = tx.pricePerShare || (tx.total! / Math.abs(tx.shares!));
@@ -654,6 +688,7 @@ const App: React.FC = () => {
                             }
                         } else if (tx.action === 'buy' && tx.shares! > 0) {
                             updatedAsset.holdings.push({
+                                id: `holding-${Date.now()}-${Math.random()}`,
                                 ticker: tx.ticker!,
                                 name: tx.name || tx.ticker!,
                                 type: 'Stock',
@@ -663,65 +698,25 @@ const App: React.FC = () => {
                         }
                     });
 
-                    // Calculate portfolio value based on current prices
-                    if (updatedAsset.holdings && updatedAsset.holdings.length > 0) {
+                    if (marketDataResponse && updatedAsset.holdings && updatedAsset.holdings.length > 0) {
                         updatedAsset.holdings.forEach(holding => {
-                            const currentPrice = marketDataResponse[holding.ticker]?.price || holding.avgCost;
+                            const apiTicker = holding.isLondonListed ? `${holding.ticker}.L` : holding.ticker;
+                            const currentPrice = marketDataResponse[apiTicker]?.price || marketDataResponse[holding.ticker]?.price || holding.avgCost;
                             holding.currentPrice = currentPrice;
-                            const holdingValue = holding.shares * currentPrice;
-                            portfolioValue += holdingValue;
+                            portfolioValue += holding.shares * currentPrice;
                         });
                         updatedAsset.balance = portfolioValue;
                     }
 
                     return updatedAsset;
-                }));
+                });
+            };
+
+            fetchMarketData(uniqueTickers).then(marketDataResponse => {
+                setAssets(prevAssets => updateHoldingsFromTxs(prevAssets, marketDataResponse));
             }).catch(err => {
                 console.error('Failed to fetch market data:', err);
-                // Still update holdings even if market data fetch fails
-                setAssets(prevAssets => prevAssets.map(asset => {
-                    const investingTxs = investingTransactions.filter(tx => tx.accountId === asset.id);
-                    if (investingTxs.length === 0) return asset;
-
-                    const updatedAsset = { ...asset, holdings: asset.holdings ? [...asset.holdings] : [] };
-
-                    investingTxs.forEach(tx => {
-                        if (!updatedAsset.holdings) updatedAsset.holdings = [];
-
-                        if (tx.action === 'dividend') {
-                            return;
-                        }
-
-                        const existingHoldingIndex = updatedAsset.holdings.findIndex(h => h.ticker === tx.ticker);
-                        const pricePerShare = tx.pricePerShare || (tx.total! / Math.abs(tx.shares!));
-
-                        if (existingHoldingIndex > -1) {
-                            const existingHolding = updatedAsset.holdings[existingHoldingIndex];
-                            const currentShares = existingHolding.shares;
-                            const newShares = currentShares + tx.shares!;
-
-                            if (newShares > 0) {
-                                const totalCost = (existingHolding.avgCost * currentShares) + (pricePerShare * tx.shares!);
-                                existingHolding.avgCost = totalCost / newShares;
-                                existingHolding.shares = newShares;
-                            } else if (newShares < 0) {
-                                existingHolding.shares = newShares;
-                            } else {
-                                updatedAsset.holdings.splice(existingHoldingIndex, 1);
-                            }
-                        } else if (tx.action === 'buy' && tx.shares! > 0) {
-                            updatedAsset.holdings.push({
-                                ticker: tx.ticker!,
-                                name: tx.name || tx.ticker!,
-                                type: 'Stock',
-                                shares: tx.shares!,
-                                avgCost: pricePerShare
-                            });
-                        }
-                    });
-
-                    return updatedAsset;
-                }));
+                setAssets(prevAssets => updateHoldingsFromTxs(prevAssets));
             });
         }
 
@@ -808,6 +803,41 @@ const App: React.FC = () => {
             }
             return newAssets;
         });
+    };
+
+    const handleUpdateHolding = async (accountId: string, ticker: string, updates: { icon?: string; isLondonListed?: boolean }) => {
+        const holding = assets.find(a => a.id === accountId)?.holdings?.find(h => h.ticker === ticker);
+        if (!holding) return;
+
+        setAssets(prevAssets => prevAssets.map(asset => {
+            if (asset.id !== accountId || !asset.holdings) return asset;
+            return {
+                ...asset,
+                holdings: asset.holdings.map(h => h.ticker === ticker ? { ...h, ...updates } : h)
+            };
+        }));
+
+        try {
+            const dbUpdates: Record<string, any> = {};
+            if (updates.icon !== undefined) dbUpdates.icon = updates.icon;
+            if (updates.isLondonListed !== undefined) dbUpdates.is_london_listed = updates.isLondonListed;
+            dbUpdates.name = holding.name;
+            dbUpdates.type = holding.type;
+            dbUpdates.shares = holding.shares;
+            dbUpdates.avg_cost = holding.avgCost;
+
+            const saved = await holdingsService.upsertByTicker(accountId, ticker, dbUpdates);
+
+            setAssets(prevAssets => prevAssets.map(asset => {
+                if (asset.id !== accountId || !asset.holdings) return asset;
+                return {
+                    ...asset,
+                    holdings: asset.holdings.map(h => h.ticker === ticker ? { ...h, id: saved.id } : h)
+                };
+            }));
+        } catch (err) {
+            console.error('Failed to update holding:', err);
+        }
     };
 
     // Budget Handlers
@@ -1003,7 +1033,7 @@ const App: React.FC = () => {
             case Page.Transactions:
                 return <Transactions transactions={transactions} assets={assets} debts={debts} budgets={budgets} categories={categories} onAddTransaction={handleAddTransaction} onUpdateTransaction={handleUpdateTransaction} onDeleteTransaction={handleDeleteTransaction} onUpdateBudgets={handleUpdateBudgets} user={user} notifications={notifications} onUpdateUser={handleUpdateUser} onMarkAllNotificationsRead={handleMarkAllNotificationsRead} onNotificationClick={handleNotificationClick} navigateTo={navigateTo} theme={theme} onToggleTheme={handleToggleTheme} />;
             case Page.Accounts:
-                return <Accounts assets={assets} marketData={marketData} onAddAsset={handleAddAsset} onUpdateAsset={handleUpdateAsset} onDeleteAsset={handleDeleteAsset} onAddTransaction={handleAddTransaction} onUpdateTransaction={handleUpdateTransaction} transactions={transactions} user={user} notifications={notifications} debts={debts} onUpdateUser={handleUpdateUser} onMarkAllNotificationsRead={handleMarkAllNotificationsRead} onNotificationClick={handleNotificationClick} navigateTo={navigateTo} theme={theme} onToggleTheme={handleToggleTheme} />;
+                return <Accounts assets={assets} marketData={marketData} onAddAsset={handleAddAsset} onUpdateAsset={handleUpdateAsset} onDeleteAsset={handleDeleteAsset} onAddTransaction={handleAddTransaction} onUpdateTransaction={handleUpdateTransaction} transactions={transactions} user={user} notifications={notifications} debts={debts} onUpdateUser={handleUpdateUser} onMarkAllNotificationsRead={handleMarkAllNotificationsRead} onNotificationClick={handleNotificationClick} navigateTo={navigateTo} theme={theme} onToggleTheme={handleToggleTheme} onUpdateHolding={handleUpdateHolding} />;
             case Page.Debts:
                 return <Debts debts={debts} onAddDebt={handleAddDebt} onUpdateDebt={handleUpdateDebt} onDeleteDebt={handleDeleteDebt} onAddTransaction={handleAddTransaction} transactions={transactions} user={user} notifications={notifications} assets={assets} onUpdateUser={handleUpdateUser} onMarkAllNotificationsRead={handleMarkAllNotificationsRead} onNotificationClick={handleNotificationClick} navigateTo={navigateTo} theme={theme} onToggleTheme={handleToggleTheme} />;
             case Page.Trends:

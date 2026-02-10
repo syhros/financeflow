@@ -484,6 +484,44 @@ export const holdingsService = {
     return data;
   },
 
+  async upsertByTicker(assetId: string, ticker: string, updates: Record<string, any>) {
+    const { data: existing } = await supabase
+      .from('holdings')
+      .select('id')
+      .eq('asset_id', assetId)
+      .eq('ticker', ticker)
+      .maybeSingle();
+
+    if (existing) {
+      const { data, error } = await supabase
+        .from('holdings')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', existing.id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    } else {
+      const { data, error } = await supabase
+        .from('holdings')
+        .insert({ asset_id: assetId, ticker, ...updates })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    }
+  },
+
+  async getHoldingsMetadata(assetId: string) {
+    const { data, error } = await supabase
+      .from('holdings')
+      .select('id, ticker, icon, is_london_listed')
+      .eq('asset_id', assetId);
+
+    if (error) throw error;
+    return data || [];
+  },
+
   async getHoldingsByTicker(userId: string, ticker: string) {
     const { data, error } = await supabase
       .from('holdings')

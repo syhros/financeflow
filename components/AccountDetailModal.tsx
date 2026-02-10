@@ -3,7 +3,6 @@ import { Asset, Debt, Transaction, MarketData } from '../types';
 import { CloseIcon } from './icons';
 import { format } from 'date-fns';
 import { useCurrency } from '../App';
-import { holdingsService } from '../services/database';
 import { calculateHoldingMetrics } from '../utils/investmentUtils';
 
 interface AccountDetailModalProps {
@@ -14,16 +13,18 @@ interface AccountDetailModalProps {
     transactions: Transaction[];
     marketData?: MarketData;
     onUpdateTransactions?: (transactions: Transaction[]) => void;
+    onUpdateHolding?: (accountId: string, ticker: string, updates: { icon?: string; isLondonListed?: boolean }) => Promise<void>;
 }
 
-const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose, account, accountType, transactions, marketData = {}, onUpdateTransactions }) => {
+const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose, account, accountType, transactions, marketData = {}, onUpdateTransactions, onUpdateHolding }) => {
     const [currentPage, setCurrentPage] = useState(1);
     const [activeTab, setActiveTab] = useState<'transactions' | 'assets'>('transactions');
     const [perPage, setPerPage] = useState(10);
     const [editingHoldingTicker, setEditingHoldingTicker] = useState<string | null>(null);
     const [holdingIconUrl, setHoldingIconUrl] = useState('');
-    const [isSavingIcon, setIsSavingIcon] = useState(false);
-    const [iconSaveMessage, setIconSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [editingLondonListed, setEditingLondonListed] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { formatCurrency } = useCurrency();
 
@@ -36,6 +37,42 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                 setHoldingIconUrl(result);
             };
             reader.readAsDataURL(file);
+        }
+    };
+
+    const openEditModal = (ticker: string) => {
+        const holding = (account as Asset).holdings?.find(h => h.ticker === ticker);
+        setEditingHoldingTicker(ticker);
+        setHoldingIconUrl('');
+        setEditingLondonListed(holding?.isLondonListed || false);
+        setSaveMessage(null);
+    };
+
+    const handleSave = async () => {
+        if (!editingHoldingTicker || !onUpdateHolding) return;
+
+        const updates: { icon?: string; isLondonListed?: boolean } = {};
+        const holding = (account as Asset).holdings?.find(h => h.ticker === editingHoldingTicker);
+        if (!holding) return;
+
+        if (holdingIconUrl) updates.icon = holdingIconUrl;
+        updates.isLondonListed = editingLondonListed;
+
+        setIsSaving(true);
+        try {
+            await onUpdateHolding(account.id, editingHoldingTicker, updates);
+            setSaveMessage({ type: 'success', text: 'Saved successfully!' });
+            setTimeout(() => {
+                setSaveMessage(null);
+                setEditingHoldingTicker(null);
+                setHoldingIconUrl('');
+            }, 1500);
+        } catch (error) {
+            console.error('Failed to save holding:', error);
+            setSaveMessage({ type: 'error', text: 'Failed to save. Please try again.' });
+            setTimeout(() => setSaveMessage(null), 3000);
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -122,13 +159,13 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                 {asset.holdings && asset.holdings.length > 0 ? (
                                     <div className="space-y-3">
                                         {asset.holdings.map(holding => {
-                                            const metrics = calculateHoldingMetrics(
+                                            const holdingMetrics = calculateHoldingMetrics(
                                               holding,
                                               marketData[holding.ticker]?.price,
                                               holding.ticker,
                                               accountTransactions
                                             );
-                                            const currentValue = metrics.currentPrice * holding.shares;
+                                            const currentValue = holdingMetrics.currentPrice * holding.shares;
 
                                             return (
                                                 <div key={holding.ticker} className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
@@ -139,7 +176,9 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                                             )}
                                                             <div>
                                                                 <h4 className="text-white font-bold text-lg">{holding.name}</h4>
-                                                                <p className="text-gray-400 text-sm">{holding.ticker} • {holding.type}</p>
+                                                                <p className="text-gray-400 text-sm">
+                                                                    {holding.ticker}{holding.isLondonListed && <span className="text-yellow-400">.L</span>} • {holding.type}
+                                                                </p>
                                                             </div>
                                                         </div>
                                                         <div className="text-right flex items-start gap-3">
@@ -148,12 +187,9 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                                                 <p className="text-gray-400 text-xs">Current Value</p>
                                                             </div>
                                                             <button
-                                                                onClick={() => {
-                                                                    setEditingHoldingTicker(holding.ticker);
-                                                                    setHoldingIconUrl('');
-                                                                }}
+                                                                onClick={() => openEditModal(holding.ticker)}
                                                                 className="mt-1 p-2 text-gray-400 hover:text-white hover:bg-gray-600 rounded-lg transition-colors"
-                                                                title="Edit icon"
+                                                                title="Edit holding"
                                                             >
                                                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                                                             </button>
@@ -171,15 +207,15 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                                         <div>
                                                             <p className="text-gray-400 text-xs mb-1">Current Price</p>
                                                             <p className="text-white font-semibold">
-                                                              {formatCurrency(metrics.currentPrice)}
-                                                              {metrics.isEstimated && <span className="text-xs text-yellow-400 ml-1">(est.)</span>}
+                                                              {formatCurrency(holdingMetrics.currentPrice)}
+                                                              {holdingMetrics.isEstimated && <span className="text-xs text-yellow-400 ml-1">(est.)</span>}
                                                             </p>
                                                         </div>
                                                         <div>
                                                             <p className="text-gray-400 text-xs mb-1">Total P/L</p>
-                                                            <p className={`font-bold ${metrics.totalPL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                                {metrics.totalPL >= 0 ? '+' : ''}{formatCurrency(metrics.totalPL)}
-                                                                <span className="text-xs ml-1">({metrics.totalPLPercent >= 0 ? '+' : ''}{metrics.totalPLPercent.toFixed(2)}%)</span>
+                                                            <p className={`font-bold ${holdingMetrics.totalPL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                                {holdingMetrics.totalPL >= 0 ? '+' : ''}{formatCurrency(holdingMetrics.totalPL)}
+                                                                <span className="text-xs ml-1">({holdingMetrics.totalPLPercent >= 0 ? '+' : ''}{holdingMetrics.totalPLPercent.toFixed(2)}%)</span>
                                                             </p>
                                                         </div>
                                                     </div>
@@ -313,12 +349,32 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                 <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4" onClick={() => setEditingHoldingTicker(null)}>
                     <div className="bg-card-bg rounded-lg shadow-xl w-full max-w-md border border-border-color" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-between items-center p-6 border-b border-border-color">
-                            <h2 className="text-xl font-bold text-white">Edit Holding Icon</h2>
+                            <h2 className="text-xl font-bold text-white">Edit Holding</h2>
                             <button onClick={() => setEditingHoldingTicker(null)} className="text-gray-400 hover:text-white">
                                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
                         <div className="p-6 space-y-4">
+                            <div className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
+                                <p className="text-sm text-gray-400 mb-1">Ticker</p>
+                                <p className="text-white font-bold text-lg">{editingHoldingTicker}</p>
+                            </div>
+
+                            <div>
+                                <label className="flex items-center gap-3 cursor-pointer p-3 bg-gray-700/50 rounded-lg border border-gray-600 hover:border-gray-500 transition-colors">
+                                    <input
+                                        type="checkbox"
+                                        checked={editingLondonListed}
+                                        onChange={(e) => setEditingLondonListed(e.target.checked)}
+                                        className="w-5 h-5 rounded border-gray-500 text-blue-500 focus:ring-blue-500"
+                                    />
+                                    <div>
+                                        <p className="text-white font-medium">London Stock Exchange (.L)</p>
+                                        <p className="text-xs text-gray-400">Append .L suffix when fetching market data (e.g. VUSA.L)</p>
+                                    </div>
+                                </label>
+                            </div>
+
                             <div>
                                 <label className="block text-sm font-medium text-gray-300 mb-2">Icon URL for {editingHoldingTicker}</label>
                                 <input
@@ -359,13 +415,13 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                     </button>
                                 </div>
                             )}
-                            {iconSaveMessage && (
+                            {saveMessage && (
                                 <div className={`mt-3 p-3 rounded-lg text-sm font-medium ${
-                                    iconSaveMessage.type === 'success'
+                                    saveMessage.type === 'success'
                                         ? 'bg-green-500/20 text-green-400 border border-green-500/50'
                                         : 'bg-red-500/20 text-red-400 border border-red-500/50'
                                 }`}>
-                                    {iconSaveMessage.text}
+                                    {saveMessage.text}
                                 </div>
                             )}
                             <div className="flex gap-3">
@@ -376,43 +432,11 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                     Cancel
                                 </button>
                                 <button
-                                    onClick={async () => {
-                                        if (!holdingIconUrl || !editingHoldingTicker) return;
-
-                                        const matchingHolding = asset.holdings?.find(h => h.ticker === editingHoldingTicker);
-                                        if (!matchingHolding) {
-                                            setIconSaveMessage({ type: 'error', text: 'Holding not found' });
-                                            setTimeout(() => setIconSaveMessage(null), 3000);
-                                            return;
-                                        }
-
-                                        if (!matchingHolding.id) {
-                                            setIconSaveMessage({ type: 'error', text: 'Cannot save: holding ID missing. Please refresh the page.' });
-                                            setTimeout(() => setIconSaveMessage(null), 4000);
-                                            return;
-                                        }
-
-                                        setIsSavingIcon(true);
-                                        try {
-                                            await holdingsService.updateHolding(matchingHolding.id, { icon: holdingIconUrl });
-                                            setIconSaveMessage({ type: 'success', text: 'Icon saved successfully!' });
-                                            setTimeout(() => {
-                                                setIconSaveMessage(null);
-                                                setEditingHoldingTicker(null);
-                                                setHoldingIconUrl('');
-                                            }, 1500);
-                                        } catch (error) {
-                                            console.error('Failed to save icon for holding:', error);
-                                            setIconSaveMessage({ type: 'error', text: 'Failed to save icon. Please try again.' });
-                                            setTimeout(() => setIconSaveMessage(null), 3000);
-                                        } finally {
-                                            setIsSavingIcon(false);
-                                        }
-                                    }}
+                                    onClick={handleSave}
                                     className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                    disabled={!holdingIconUrl || isSavingIcon}
+                                    disabled={isSaving}
                                 >
-                                    {isSavingIcon ? 'Saving...' : 'Save Icon'}
+                                    {isSaving ? 'Saving...' : 'Save'}
                                 </button>
                             </div>
                         </div>
