@@ -11,12 +11,15 @@ interface AccountDetailModalProps {
     accountType: 'asset' | 'debt';
     transactions: Transaction[];
     marketData?: MarketData;
+    onUpdateTransactions?: (transactions: Transaction[]) => void;
 }
 
-const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose, account, accountType, transactions, marketData = {} }) => {
+const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose, account, accountType, transactions, marketData = {}, onUpdateTransactions }) => {
     const [currentPage, setCurrentPage] = useState(1);
     const [activeTab, setActiveTab] = useState<'transactions' | 'assets'>('transactions');
     const [perPage, setPerPage] = useState(10);
+    const [editingHoldingTicker, setEditingHoldingTicker] = useState<string | null>(null);
+    const [holdingIconUrl, setHoldingIconUrl] = useState('');
     const { formatCurrency } = useCurrency();
 
     const isInvestingAccount = accountType === 'asset' && 'holdings' in account && account.type === 'Investing';
@@ -115,9 +118,21 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                                             <h4 className="text-white font-bold text-lg">{holding.name}</h4>
                                                             <p className="text-gray-400 text-sm">{holding.ticker} • {holding.type}</p>
                                                         </div>
-                                                        <div className="text-right">
-                                                            <p className="text-white font-bold text-lg">{formatCurrency(currentValue)}</p>
-                                                            <p className="text-gray-400 text-xs">Current Value</p>
+                                                        <div className="text-right flex items-start gap-3">
+                                                            <div>
+                                                                <p className="text-white font-bold text-lg">{formatCurrency(currentValue)}</p>
+                                                                <p className="text-gray-400 text-xs">Current Value</p>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEditingHoldingTicker(holding.ticker);
+                                                                    setHoldingIconUrl('');
+                                                                }}
+                                                                className="mt-1 p-2 text-gray-400 hover:text-white hover:bg-gray-600 rounded-lg transition-colors"
+                                                                title="Edit icon"
+                                                            >
+                                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                                            </button>
                                                         </div>
                                                     </div>
                                                     <div className="grid grid-cols-3 gap-4 pt-3 border-t border-gray-600">
@@ -262,6 +277,61 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                     </div>
                 </div>
             </div>
+
+            {editingHoldingTicker && (
+                <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4" onClick={() => setEditingHoldingTicker(null)}>
+                    <div className="bg-card-bg rounded-lg shadow-xl w-full max-w-md border border-border-color" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-between items-center p-6 border-b border-border-color">
+                            <h2 className="text-xl font-bold text-white">Edit Holding Icon</h2>
+                            <button onClick={() => setEditingHoldingTicker(null)} className="text-gray-400 hover:text-white">
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-2">Icon URL for {editingHoldingTicker}</label>
+                                <input
+                                    type="text"
+                                    value={holdingIconUrl}
+                                    onChange={(e) => setHoldingIconUrl(e.target.value)}
+                                    placeholder="e.g., https://logo.clearbit.com/apple.com"
+                                    className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 border border-gray-600 focus:border-primary outline-none"
+                                />
+                                {holdingIconUrl && (
+                                    <div className="mt-4 flex items-center gap-3">
+                                        <img src={holdingIconUrl} alt="preview" className="w-12 h-12 rounded-lg" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                                        <span className="text-sm text-gray-400">Preview</span>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setEditingHoldingTicker(null)}
+                                    className="flex-1 py-3 bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-600 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        if (holdingIconUrl && editingHoldingTicker && onUpdateTransactions) {
+                                            const updatedTransactions = transactions.map(tx =>
+                                                tx.ticker === editingHoldingTicker ? { ...tx, logo: holdingIconUrl } : tx
+                                            );
+                                            onUpdateTransactions(updatedTransactions);
+                                        }
+                                        setEditingHoldingTicker(null);
+                                        setHoldingIconUrl('');
+                                    }}
+                                    className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-500 transition-colors"
+                                    disabled={!holdingIconUrl}
+                                >
+                                    Save Icon
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

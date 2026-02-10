@@ -177,19 +177,20 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
           const total = parseFloat(getValue('total') || '0');
           const currencyTotal = getValue('currency_total') || 'GBP';
 
-          if (!date || !action || !ticker || !shares || !total) return;
+          if (!date || !action || !ticker || (!shares && !action.toLowerCase().includes('dividend')) || (!total && !action.toLowerCase().includes('dividend'))) return;
 
+          const isDividend = action.toLowerCase().includes('dividend');
           const isBuy = action.toLowerCase().includes('buy');
-          const purchasePrice = pricePerShare || (total / shares);
+          const purchasePrice = isDividend ? 0 : (pricePerShare || (total / shares));
 
           transactions.push({
             id: `import-${rowIndex}`,
             date,
-            action: isBuy ? 'buy' : 'sell',
+            action: isDividend ? 'dividend' : (isBuy ? 'buy' : 'sell'),
             ticker,
             name: name || ticker,
-            shares: isBuy ? shares : -shares,
-            pricePerShare,
+            shares: isDividend ? 0 : (isBuy ? shares : -shares),
+            pricePerShare: purchasePrice,
             currencyPrice,
             exchangeRate,
             total,
@@ -197,7 +198,7 @@ const CSVImportPreviewModal: React.FC<CSVImportPreviewModalProps> = ({ isOpen, o
             type: 'investing',
             amount: total,
             accountId: selectedAccountId,
-            merchant: `${isBuy ? 'BUY' : 'SELL'} ${shares} × ${ticker}`,
+            merchant: isDividend ? `DIVIDEND ${ticker}` : `${isBuy ? 'BUY' : 'SELL'} ${shares} × ${ticker}`,
             category: 'Investments',
             logo: '',
           });

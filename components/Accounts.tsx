@@ -14,6 +14,7 @@ interface AccountsProps {
     onUpdateAsset: (asset: Asset, oldBalance?: number) => void;
     onDeleteAsset: (assetId: string) => void;
     onAddTransaction?: (transaction: Omit<Transaction, 'id'>) => void;
+    onUpdateTransaction?: (transaction: Transaction) => void;
     transactions: Transaction[];
     user: User;
     notifications: Notification[];
@@ -40,6 +41,7 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; chi
       </div>
     );
 };
+
 
 const AddEditAccountModal: React.FC<{ isOpen: boolean; onClose: () => void; asset?: Asset; onSave: (asset: any, oldBalance?: number) => void; onDelete?: (assetId: string) => void; marketData: MarketData; }> = ({ isOpen, onClose, asset, onSave, onDelete, marketData }) => {
     const [formData, setFormData] = useState<any>({});
@@ -162,7 +164,7 @@ const AssetAccountCard: React.FC<{ asset: Asset; onEdit: (acc: Asset) => void; o
     );
 };
 
-const Accounts: React.FC<AccountsProps> = ({ assets, marketData, onAddAsset, onUpdateAsset, onDeleteAsset, onAddTransaction, transactions = [], user, notifications, debts, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
+const Accounts: React.FC<AccountsProps> = ({ assets, marketData, onAddAsset, onUpdateAsset, onDeleteAsset, onAddTransaction, onUpdateTransaction, transactions = [], user, notifications, debts, onUpdateUser, onMarkAllNotificationsRead, onNotificationClick, navigateTo, theme, onToggleTheme }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingAsset, setEditingAsset] = useState<Asset | undefined>(undefined);
     const [showClosed, setShowClosed] = useState(false);
@@ -283,6 +285,13 @@ const Accounts: React.FC<AccountsProps> = ({ assets, marketData, onAddAsset, onU
                     accountType="asset"
                     transactions={transactions}
                     marketData={marketData}
+                    onUpdateTransactions={(updatedTransactions) => {
+                        updatedTransactions.forEach(tx => {
+                            if (onUpdateTransaction) {
+                                onUpdateTransaction(tx);
+                            }
+                        });
+                    }}
                 />
             )}
         </>

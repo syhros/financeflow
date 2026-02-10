@@ -62,7 +62,7 @@ export interface Transaction {
     shares?: number;
     purchasePrice?: number;
     pricePerShare?: number;
-    action?: 'buy' | 'sell';
+    action?: 'buy' | 'sell' | 'dividend';
     name?: string;
     currencyPrice?: string;
     exchangeRate?: number;

@@ -119,10 +119,26 @@ const AddEditTransactionModal: React.FC<{ isOpen: boolean; onClose: () => void; 
                 
                 {formData.type === 'investing' ? (
                     <>
-                        <div><label htmlFor="ticker" className={labelStyles}>Ticker</label><input type="text" id="ticker" placeholder="e.g., AAPL, BTC-USD" value={formData.ticker || ''} onChange={handleChange} className={commonInputStyles} /></div>
+                        <div className="space-y-2">
+                            <label htmlFor="ticker" className={labelStyles}>Ticker</label>
+                            <div className="flex gap-2">
+                                <input type="text" id="ticker" placeholder="e.g., AAPL, BTC-USD" value={formData.ticker || ''} onChange={handleChange} className={`${commonInputStyles} flex-1`} />
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData({...formData, action: formData.action === 'dividend' ? 'buy' : 'dividend', purchasePrice: formData.action === 'dividend' ? 0 : formData.purchasePrice})}
+                                    className={`px-4 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap ${
+                                        formData.action === 'dividend'
+                                            ? 'bg-green-600 text-white hover:bg-green-500'
+                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                    }`}
+                                >
+                                    {formData.action === 'dividend' ? 'Dividend' : 'Dividend'}
+                                </button>
+                            </div>
+                        </div>
                         <div className="grid grid-cols-2 gap-4">
-                            <div><label htmlFor="shares" className={labelStyles}>Amount / Shares</label><input type="number" id="shares" value={formData.shares || 0} onChange={e => setFormData({...formData, shares: parseFloat(e.target.value)})} className={commonInputStyles} /></div>
-                            <div><label htmlFor="purchasePrice" className={labelStyles}>Price per Share</label><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">{currencySymbol}</span><input type="number" id="purchasePrice" value={formData.purchasePrice || 0} onChange={e => setFormData({...formData, purchasePrice: parseFloat(e.target.value)})} className={`${commonInputStyles} pl-7`} /></div></div>
+                            <div><label htmlFor="shares" className={labelStyles}>Amount / Shares</label><input type="number" id="shares" value={formData.shares || 0} onChange={e => setFormData({...formData, shares: parseFloat(e.target.value)})} className={commonInputStyles} disabled={formData.action === 'dividend'} /></div>
+                            <div><label htmlFor="purchasePrice" className={labelStyles}>Price per Share</label><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">{currencySymbol}</span><input type="number" id="purchasePrice" value={formData.purchasePrice || 0} onChange={e => setFormData({...formData, purchasePrice: parseFloat(e.target.value)})} className={`${commonInputStyles} pl-7`} disabled={formData.action === 'dividend'} /></div></div>
                         </div>
                         <div>
                             <label htmlFor="accountId" className={labelStyles}>Investing Account</label>
