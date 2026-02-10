@@ -17,7 +17,14 @@ export function getLatestTransactionPrice(ticker: string, transactions: Transact
   if (relevantTransactions.length === 0) return null;
 
   const latestTx = relevantTransactions[0];
-  return latestTx.pricePerShare || (latestTx.total && latestTx.shares ? latestTx.total / latestTx.shares : null);
+  const pricePerShare = latestTx.pricePerShare || (latestTx.total && latestTx.shares ? latestTx.total / Math.abs(latestTx.shares) : null);
+
+  // Apply exchange rate conversion if needed
+  if (pricePerShare && latestTx.exchangeRate) {
+    return pricePerShare * latestTx.exchangeRate;
+  }
+
+  return pricePerShare;
 }
 
 export function calculateHoldingMetrics(
@@ -26,50 +33,90 @@ export function calculateHoldingMetrics(
   ticker: string,
   transactions: Transaction[]
 ): HoldingMetrics {
-  let currentPrice = currentMarketPrice || holding.currentPrice || holding.avgCost;
+  // Determine current price with fallback logic
+  let currentPrice = currentMarketPrice;
   let isEstimated = false;
 
-  if (!currentMarketPrice && !holding.currentPrice) {
-    const fallbackPrice = getLatestTransactionPrice(ticker, transactions);
-    if (fallbackPrice) {
-      currentPrice = fallbackPrice;
-      isEstimated = true;
+  if (!currentMarketPrice) {
+    if (holding.currentPrice) {
+      currentPrice = holding.currentPrice;
+    } else {
+      const fallbackPrice = getLatestTransactionPrice(ticker, transactions);
+      if (fallbackPrice) {
+        currentPrice = fallbackPrice;
+        isEstimated = true;
+      } else {
+        currentPrice = holding.avgCost;
+        isEstimated = true;
+      }
     }
   }
 
-  const unrealizedPL = (currentPrice * holding.shares) - (holding.avgCost * holding.shares);
+  // Sort transactions chronologically (oldest first)
+  const tickerTransactions = transactions
+    .filter(tx => tx.ticker === ticker)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  const tickerTransactions = transactions.filter(tx => tx.ticker === ticker);
+  // Track running weighted average cost basis and shares
+  let runningAvgCost = 0;
+  let runningShares = 0;
   let realizedPL = 0;
-  let totalCostBasis = 0;
-  let totalSharesSold = 0;
+  let totalDividends = 0;
 
   tickerTransactions.forEach(tx => {
-    if (tx.action === 'buy' && tx.shares) {
-      totalCostBasis += (tx.pricePerShare || (tx.total / tx.shares)) * tx.shares;
-    } else if (tx.action === 'sell' && tx.shares) {
-      const soldSharesCount = Math.abs(tx.shares);
-      const costPerShare = totalCostBasis / (Math.abs(
-        tickerTransactions
-          .filter(t => t.action === 'buy' && t.shares)
-          .reduce((sum, t) => sum + t.shares!, 0)
-      ) || 1);
+    if (tx.action === 'dividend') {
+      // Track dividends separately
+      totalDividends += tx.amount || tx.total || 0;
+    } else if (tx.action === 'buy' && tx.shares) {
+      // Calculate price per share in GBP
+      let pricePerShare = tx.pricePerShare || (tx.total! / Math.abs(tx.shares));
+      const exchangeRate = tx.exchangeRate || 1;
+      pricePerShare = pricePerShare * exchangeRate;
 
-      realizedPL += (soldSharesCount * (tx.pricePerShare || (tx.total / Math.abs(tx.shares)))) -
-                    (soldSharesCount * costPerShare);
-      totalSharesSold += soldSharesCount;
+      const sharesBought = Math.abs(tx.shares);
+
+      // Update weighted average cost
+      if (runningShares > 0) {
+        const totalCost = (runningAvgCost * runningShares) + (pricePerShare * sharesBought);
+        runningShares += sharesBought;
+        runningAvgCost = totalCost / runningShares;
+      } else {
+        runningShares = sharesBought;
+        runningAvgCost = pricePerShare;
+      }
+    } else if (tx.action === 'sell' && tx.shares) {
+      // Calculate realized P/L for this sell
+      let sellPricePerShare = tx.pricePerShare || (tx.total! / Math.abs(tx.shares));
+      const exchangeRate = tx.exchangeRate || 1;
+      sellPricePerShare = sellPricePerShare * exchangeRate;
+
+      const sharesSold = Math.abs(tx.shares);
+
+      // Calculate realized gain/loss
+      const sellProceeds = sharesSold * sellPricePerShare;
+      const sellCost = sharesSold * runningAvgCost;
+      realizedPL += (sellProceeds - sellCost);
+
+      // Reduce running shares (avg cost stays the same)
+      runningShares -= sharesSold;
     }
   });
 
-  const totalPL = unrealizedPL + realizedPL;
-  const totalInvested = holding.avgCost * holding.shares + realizedPL;
-  const totalPLPercent = totalInvested > 0 ? (totalPL / Math.abs(totalInvested)) * 100 : 0;
+  // Calculate unrealized P/L on remaining shares
+  const unrealizedPL = (currentPrice * holding.shares) - (holding.avgCost * holding.shares);
+
+  // Total P/L includes realized gains/losses, unrealized gains/losses, and dividends
+  const totalPL = realizedPL + unrealizedPL + totalDividends;
+
+  // Calculate percentage
+  const totalInvested = holding.avgCost * holding.shares;
+  const totalPLPercent = totalInvested > 0 ? (totalPL / totalInvested) * 100 : 0;
 
   return {
     currentPrice,
     isEstimated,
     unrealizedPL,
-    realizedPL,
+    realizedPL: realizedPL + totalDividends,
     totalPL,
     totalPLPercent
   };

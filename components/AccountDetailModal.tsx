@@ -145,6 +145,7 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
 
     const metrics = useMemo(() => {
         let totalIncome = 0;
+        let totalInvested = 0;
         const totalExpenses = accountTransactions
             .filter(t => t.type === 'expense')
             .reduce((sum, t) => sum + t.amount, 0);
@@ -159,6 +160,7 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                     accountTransactions
                 );
                 totalIncome += holdingMetrics.totalPL;
+                totalInvested += effectiveHolding.shares * effectiveHolding.avgCost;
             });
         } else {
             totalIncome = accountTransactions
@@ -170,7 +172,7 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
             ? totalIncome - totalExpenses
             : totalExpenses - totalIncome;
 
-        return { totalIncome, totalExpenses, netChange };
+        return { totalIncome, totalExpenses, netChange, totalInvested };
     }, [accountTransactions, accountType, isInvestingAccount, account, marketData]);
 
     if (!isOpen) return null;
@@ -299,7 +301,8 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                                         </div>
                                                         <div>
                                                             <p className="text-gray-400 text-xs mb-1">Current Price</p>
-                                                            <p className="text-white font-semibold">
+                                                            <p className="text-white font-semibold flex items-center gap-1">
+                                                              {!holdingMetrics.isEstimated && <span className="w-2 h-2 bg-green-400 rounded-full"></span>}
                                                               {formatCurrency(holdingMetrics.currentPrice)}
                                                               {holdingMetrics.isEstimated && <span className="text-xs text-yellow-400 ml-1">(est.)</span>}
                                                             </p>
@@ -504,28 +507,48 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                 <p className={`text-3xl font-bold ${accountType === 'debt' ? 'text-red-300' : 'text-white'}`}>{formatCurrency(account.balance)}</p>
                             </div>
 
-                            <div className={`p-4 rounded-lg border ${metrics.totalIncome >= 0 ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
-                                <p className="text-gray-400 text-sm mb-1">{accountType === 'debt' ? 'Total Payments' : isInvestingAccount ? 'Total P/L' : 'Total Income'}</p>
-                                <p className={`text-2xl font-bold ${metrics.totalIncome >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                    {metrics.totalIncome >= 0 ? '+' : ''}{formatCurrency(metrics.totalIncome).replace(/^[+-]/, '')}
-                                </p>
-                                <p className="text-xs text-gray-500 mt-1">{isInvestingAccount ? 'All holdings' : accountTransactions.filter(t => t.type === 'income').length + ' transactions'}</p>
-                            </div>
+                            {isInvestingAccount ? (
+                                <>
+                                    <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                                        <p className="text-gray-400 text-sm mb-1">Total Invested</p>
+                                        <p className="text-2xl font-bold text-blue-400">{formatCurrency(metrics.totalInvested)}</p>
+                                        <p className="text-xs text-gray-500 mt-1">All active holdings</p>
+                                    </div>
 
-                            <div className="p-4 bg-red-500/10 rounded-lg border border-red-500/30">
-                                <p className="text-gray-400 text-sm mb-1">Total Expenses</p>
-                                <p className="text-2xl font-bold text-red-400">-{formatCurrency(metrics.totalExpenses).replace(/[+-]/g, '')}</p>
-                                <p className="text-xs text-gray-500 mt-1">{accountTransactions.filter(t => t.type === 'expense').length} transactions</p>
-                            </div>
+                                    <div className={`p-4 rounded-lg border ${metrics.totalIncome >= 0 ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                                        <p className="text-gray-400 text-sm mb-1">Total P/L</p>
+                                        <p className={`text-2xl font-bold ${metrics.totalIncome >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                            {metrics.totalIncome >= 0 ? '+' : ''}{formatCurrency(metrics.totalIncome).replace(/^[+-]/, '')}
+                                        </p>
+                                        <p className="text-xs text-gray-500 mt-1">All holdings</p>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className={`p-4 rounded-lg border ${metrics.totalIncome >= 0 ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                                        <p className="text-gray-400 text-sm mb-1">{accountType === 'debt' ? 'Total Payments' : 'Total Income'}</p>
+                                        <p className={`text-2xl font-bold ${metrics.totalIncome >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                            {metrics.totalIncome >= 0 ? '+' : ''}{formatCurrency(metrics.totalIncome).replace(/^[+-]/, '')}
+                                        </p>
+                                        <p className="text-xs text-gray-500 mt-1">{accountTransactions.filter(t => t.type === 'income').length} transactions</p>
+                                    </div>
 
-                            {accountType === 'asset' && (
-                                <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                                    <p className="text-gray-400 text-sm mb-1">Net Change</p>
-                                    <p className={`text-2xl font-bold ${metrics.netChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                        {metrics.netChange >= 0 ? '+' : ''}{formatCurrency(metrics.netChange)}
-                                    </p>
-                                    <p className="text-xs text-gray-500 mt-1">Income minus expenses</p>
-                                </div>
+                                    <div className="p-4 bg-red-500/10 rounded-lg border border-red-500/30">
+                                        <p className="text-gray-400 text-sm mb-1">Total Expenses</p>
+                                        <p className="text-2xl font-bold text-red-400">-{formatCurrency(metrics.totalExpenses).replace(/[+-]/g, '')}</p>
+                                        <p className="text-xs text-gray-500 mt-1">{accountTransactions.filter(t => t.type === 'expense').length} transactions</p>
+                                    </div>
+
+                                    {accountType === 'asset' && (
+                                        <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                                            <p className="text-gray-400 text-sm mb-1">Net Change</p>
+                                            <p className={`text-2xl font-bold ${metrics.netChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                {metrics.netChange >= 0 ? '+' : ''}{formatCurrency(metrics.netChange)}
+                                            </p>
+                                            <p className="text-xs text-gray-500 mt-1">Income minus expenses</p>
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
                     </div>

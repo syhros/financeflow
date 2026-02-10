@@ -515,7 +515,7 @@ export const holdingsService = {
   async getHoldingsMetadata(assetId: string) {
     const { data, error } = await supabase
       .from('holdings')
-      .select('id, ticker, icon, is_london_listed')
+      .select('id, ticker, icon, is_london_listed, is_penny_stock, currency_price')
       .eq('asset_id', assetId);
 
     if (error) throw error;

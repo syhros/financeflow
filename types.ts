@@ -105,6 +105,8 @@ export interface Holding {
     currentPrice?: number;
     icon?: string;
     isLondonListed?: boolean;
+    isPennyStock?: boolean;
+    currencyPrice?: string;
 }
 
 export interface Asset extends BaseAccount {

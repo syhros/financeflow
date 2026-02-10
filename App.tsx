@@ -18,7 +18,7 @@ import { mockAssets, mockDebts, mockGoals, mockBills, mockRecurringPayments, all
 import { fetchMarketData, clearMarketDataCache } from './services/marketData';
 import { generateNotifications } from './services/notificationService';
 import { userService, assetsService, debtsService, transactionsService, goalsService, billsService, recurringPaymentsService, categoriesService, transactionRulesService, budgetService, settingsService, holdingsService } from './services/database';
-import { fetchMarketDataWithLondonSuffix, getTickerToLondonFlagMap, fetchAndMapMarketData } from './utils/marketDataHelpers';
+import { fetchMarketDataWithLondonSuffix, getTickerToLondonFlagMap, fetchAndMapMarketData, getMarketPriceForTicker } from './utils/marketDataHelpers';
 import { addMonths } from 'date-fns';
 
 // --- Context for Currency ---
@@ -141,6 +141,8 @@ const App: React.FC = () => {
                                         id: meta?.id || h.id,
                                         icon: meta?.icon || h.icon,
                                         isLondonListed: meta?.is_london_listed || false,
+                                        isPennyStock: meta?.is_penny_stock || false,
+                                        currencyPrice: meta?.currency_price || h.currencyPrice,
                                     };
                                 })
                             };
@@ -242,7 +244,12 @@ const App: React.FC = () => {
             const newAssets = prevAssets.map(asset => {
                 if (asset.type === 'Investing' && asset.holdings) {
                     const newBalance = asset.holdings.reduce((total, holding) => {
-                        const currentPrice = marketData[holding.ticker]?.price || 0;
+                        const currentPrice = getMarketPriceForTicker(
+                            holding.ticker,
+                            holding.isLondonListed || false,
+                            holding.isPennyStock || false,
+                            marketData
+                        ) || holding.avgCost || 0;
                         return total + (currentPrice * holding.shares);
                     }, 0);
 
@@ -672,7 +679,15 @@ const App: React.FC = () => {
                         if (tx.action === 'dividend') return;
 
                         const existingHoldingIndex = updatedAsset.holdings.findIndex(h => h.ticker === tx.ticker);
-                        const pricePerShare = tx.pricePerShare || (tx.total! / Math.abs(tx.shares!));
+                        let pricePerShare = tx.pricePerShare || (tx.total! / Math.abs(tx.shares!));
+
+                        // Apply exchange rate conversion to get price in GBP
+                        const exchangeRate = tx.exchangeRate || 1;
+                        const priceInGBP = pricePerShare * exchangeRate;
+
+                        // Auto-detect penny stock from currency
+                        const currencyPrice = tx.currencyPrice || 'GBP';
+                        const isPennyStock = currencyPrice === 'GBX';
 
                         if (existingHoldingIndex > -1) {
                             const existingHolding = updatedAsset.holdings[existingHoldingIndex];
@@ -680,7 +695,7 @@ const App: React.FC = () => {
                             const newShares = currentShares + tx.shares!;
 
                             if (newShares > 0) {
-                                const totalCost = (existingHolding.avgCost * currentShares) + (pricePerShare * tx.shares!);
+                                const totalCost = (existingHolding.avgCost * currentShares) + (priceInGBP * tx.shares!);
                                 existingHolding.avgCost = totalCost / newShares;
                                 existingHolding.shares = newShares;
                             } else if (newShares < 0) {
@@ -688,6 +703,10 @@ const App: React.FC = () => {
                             } else {
                                 updatedAsset.holdings.splice(existingHoldingIndex, 1);
                             }
+
+                            // Update currency info if not set
+                            if (!existingHolding.currencyPrice) existingHolding.currencyPrice = currencyPrice;
+                            if (existingHolding.isPennyStock === undefined) existingHolding.isPennyStock = isPennyStock;
                         } else if (tx.action === 'buy' && tx.shares! > 0) {
                             updatedAsset.holdings.push({
                                 id: `holding-${Date.now()}-${Math.random()}`,
@@ -695,17 +714,30 @@ const App: React.FC = () => {
                                 name: tx.name || tx.ticker!,
                                 type: 'Stock',
                                 shares: tx.shares!,
-                                avgCost: pricePerShare
+                                avgCost: priceInGBP,
+                                currencyPrice: currencyPrice,
+                                isPennyStock: isPennyStock
                             });
                         }
                     });
 
                     if (marketDataResponse && updatedAsset.holdings && updatedAsset.holdings.length > 0) {
                         updatedAsset.holdings.forEach(holding => {
-                            const apiTicker = holding.isLondonListed ? `${holding.ticker}.L` : holding.ticker;
-                            const currentPrice = marketDataResponse[apiTicker]?.price || marketDataResponse[holding.ticker]?.price || holding.avgCost;
-                            holding.currentPrice = currentPrice;
-                            portfolioValue += holding.shares * currentPrice;
+                            const marketPrice = getMarketPriceForTicker(
+                                holding.ticker,
+                                holding.isLondonListed || false,
+                                holding.isPennyStock || false,
+                                marketDataResponse
+                            );
+
+                            // Only set currentPrice if we have actual market data
+                            if (marketPrice) {
+                                holding.currentPrice = marketPrice;
+                                portfolioValue += holding.shares * marketPrice;
+                            } else {
+                                // Use avgCost for portfolio calculation but don't set currentPrice
+                                portfolioValue += holding.shares * holding.avgCost;
+                            }
                         });
                         updatedAsset.balance = portfolioValue;
                     }
@@ -812,7 +844,7 @@ const App: React.FC = () => {
         });
     };
 
-    const handleUpdateHolding = async (accountId: string, ticker: string, updates: { icon?: string; isLondonListed?: boolean }) => {
+    const handleUpdateHolding = async (accountId: string, ticker: string, updates: { icon?: string; isLondonListed?: boolean; isPennyStock?: boolean; currencyPrice?: string }) => {
         const holding = assets.find(a => a.id === accountId)?.holdings?.find(h => h.ticker === ticker);
         if (!holding) return;
 
@@ -828,6 +860,8 @@ const App: React.FC = () => {
             const dbUpdates: Record<string, any> = {};
             if (updates.icon !== undefined) dbUpdates.icon = updates.icon;
             if (updates.isLondonListed !== undefined) dbUpdates.is_london_listed = updates.isLondonListed;
+            if (updates.isPennyStock !== undefined) dbUpdates.is_penny_stock = updates.isPennyStock;
+            if (updates.currencyPrice !== undefined) dbUpdates.currency_price = updates.currencyPrice;
             dbUpdates.name = holding.name;
             dbUpdates.type = holding.type;
             dbUpdates.shares = holding.shares;
