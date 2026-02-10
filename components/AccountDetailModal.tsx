@@ -102,7 +102,7 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                 {asset.holdings && asset.holdings.length > 0 ? (
                                     <div className="space-y-3">
                                         {asset.holdings.map(holding => {
-                                            const currentPrice = marketData[holding.ticker]?.price || 0;
+                                            const currentPrice = holding.currentPrice || marketData[holding.ticker]?.price || holding.avgCost;
                                             const currentValue = currentPrice * holding.shares;
                                             const totalCost = holding.avgCost * holding.shares;
                                             const profitLoss = currentValue - totalCost;

@@ -594,46 +594,108 @@ const App: React.FC = () => {
 
         setTransactions(prev => [...prev, ...importedTransactions]);
 
-        // Update asset holdings for investing transactions
-        setAssets(prevAssets => prevAssets.map(asset => {
-            const investingTxs = investingTransactions.filter(tx => tx.accountId === asset.id);
-            if (investingTxs.length === 0) return asset;
+        // Get unique tickers from investing transactions to fetch current prices
+        const uniqueTickers = [...new Set(investingTransactions.map(tx => tx.ticker).filter(Boolean))];
 
-            const updatedAsset = { ...asset, holdings: asset.holdings ? [...asset.holdings] : [] };
+        // Fetch current market data for all tickers
+        if (uniqueTickers.length > 0) {
+            fetchMarketData(uniqueTickers).then(marketDataResponse => {
+                // Update asset holdings and calculate portfolio balance
+                setAssets(prevAssets => prevAssets.map(asset => {
+                    const investingTxs = investingTransactions.filter(tx => tx.accountId === asset.id);
+                    if (investingTxs.length === 0) return asset;
 
-            investingTxs.forEach(tx => {
-                if (!updatedAsset.holdings) updatedAsset.holdings = [];
+                    const updatedAsset = { ...asset, holdings: asset.holdings ? [...asset.holdings] : [] };
+                    let portfolioValue = 0;
 
-                const existingHoldingIndex = updatedAsset.holdings.findIndex(h => h.ticker === tx.ticker);
-                const pricePerShare = tx.pricePerShare || (tx.total! / Math.abs(tx.shares!));
+                    investingTxs.forEach(tx => {
+                        if (!updatedAsset.holdings) updatedAsset.holdings = [];
 
-                if (existingHoldingIndex > -1) {
-                    const existingHolding = updatedAsset.holdings[existingHoldingIndex];
-                    const currentShares = existingHolding.shares;
-                    const newShares = currentShares + tx.shares!;
+                        const existingHoldingIndex = updatedAsset.holdings.findIndex(h => h.ticker === tx.ticker);
+                        const pricePerShare = tx.pricePerShare || (tx.total! / Math.abs(tx.shares!));
 
-                    if (newShares > 0) {
-                        const totalCost = (existingHolding.avgCost * currentShares) + (pricePerShare * tx.shares!);
-                        existingHolding.avgCost = totalCost / newShares;
-                        existingHolding.shares = newShares;
-                    } else if (newShares < 0) {
-                        existingHolding.shares = newShares;
-                    } else {
-                        updatedAsset.holdings.splice(existingHoldingIndex, 1);
-                    }
-                } else if (tx.action === 'buy' && tx.shares! > 0) {
-                    updatedAsset.holdings.push({
-                        ticker: tx.ticker!,
-                        name: tx.name || tx.ticker!,
-                        type: 'Stock',
-                        shares: tx.shares!,
-                        avgCost: pricePerShare
+                        if (existingHoldingIndex > -1) {
+                            const existingHolding = updatedAsset.holdings[existingHoldingIndex];
+                            const currentShares = existingHolding.shares;
+                            const newShares = currentShares + tx.shares!;
+
+                            if (newShares > 0) {
+                                const totalCost = (existingHolding.avgCost * currentShares) + (pricePerShare * tx.shares!);
+                                existingHolding.avgCost = totalCost / newShares;
+                                existingHolding.shares = newShares;
+                            } else if (newShares < 0) {
+                                existingHolding.shares = newShares;
+                            } else {
+                                updatedAsset.holdings.splice(existingHoldingIndex, 1);
+                            }
+                        } else if (tx.action === 'buy' && tx.shares! > 0) {
+                            updatedAsset.holdings.push({
+                                ticker: tx.ticker!,
+                                name: tx.name || tx.ticker!,
+                                type: 'Stock',
+                                shares: tx.shares!,
+                                avgCost: pricePerShare
+                            });
+                        }
                     });
-                }
-            });
 
-            return updatedAsset;
-        }));
+                    // Calculate portfolio value based on current prices
+                    if (updatedAsset.holdings && updatedAsset.holdings.length > 0) {
+                        updatedAsset.holdings.forEach(holding => {
+                            const currentPrice = marketDataResponse[holding.ticker]?.price || holding.avgCost;
+                            holding.currentPrice = currentPrice;
+                            const holdingValue = holding.shares * currentPrice;
+                            portfolioValue += holdingValue;
+                        });
+                        updatedAsset.balance = portfolioValue;
+                    }
+
+                    return updatedAsset;
+                }));
+            }).catch(err => {
+                console.error('Failed to fetch market data:', err);
+                // Still update holdings even if market data fetch fails
+                setAssets(prevAssets => prevAssets.map(asset => {
+                    const investingTxs = investingTransactions.filter(tx => tx.accountId === asset.id);
+                    if (investingTxs.length === 0) return asset;
+
+                    const updatedAsset = { ...asset, holdings: asset.holdings ? [...asset.holdings] : [] };
+
+                    investingTxs.forEach(tx => {
+                        if (!updatedAsset.holdings) updatedAsset.holdings = [];
+
+                        const existingHoldingIndex = updatedAsset.holdings.findIndex(h => h.ticker === tx.ticker);
+                        const pricePerShare = tx.pricePerShare || (tx.total! / Math.abs(tx.shares!));
+
+                        if (existingHoldingIndex > -1) {
+                            const existingHolding = updatedAsset.holdings[existingHoldingIndex];
+                            const currentShares = existingHolding.shares;
+                            const newShares = currentShares + tx.shares!;
+
+                            if (newShares > 0) {
+                                const totalCost = (existingHolding.avgCost * currentShares) + (pricePerShare * tx.shares!);
+                                existingHolding.avgCost = totalCost / newShares;
+                                existingHolding.shares = newShares;
+                            } else if (newShares < 0) {
+                                existingHolding.shares = newShares;
+                            } else {
+                                updatedAsset.holdings.splice(existingHoldingIndex, 1);
+                            }
+                        } else if (tx.action === 'buy' && tx.shares! > 0) {
+                            updatedAsset.holdings.push({
+                                ticker: tx.ticker!,
+                                name: tx.name || tx.ticker!,
+                                type: 'Stock',
+                                shares: tx.shares!,
+                                avgCost: pricePerShare
+                            });
+                        }
+                    });
+
+                    return updatedAsset;
+                }));
+            });
+        }
 
         // Calculate balance changes per account for banking transactions
         const balanceChanges = new Map<string, number>();

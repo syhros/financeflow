@@ -101,6 +101,7 @@ export interface Holding {
     name: string;
     shares: number;
     avgCost: number;
+    currentPrice?: number;
 }
 
 export interface Asset extends BaseAccount {
