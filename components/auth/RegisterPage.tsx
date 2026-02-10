@@ -16,12 +16,50 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) => {
   });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
+
+  const validatePassword = (pwd: string) => {
+    const errors: string[] = [];
+    if (pwd.length < 6) errors.push('At least 6 characters');
+    if (!/[A-Z]/.test(pwd)) errors.push('One uppercase letter');
+    if (!/[a-z]/.test(pwd)) errors.push('One lowercase letter');
+    if (!/[0-9]/.test(pwd)) errors.push('One number');
+    return errors;
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [name]: value,
     });
+
+    const newFieldErrors = { ...fieldErrors };
+
+    if (name === 'password') {
+      const errors = validatePassword(value);
+      newFieldErrors.password = errors.length > 0 ? errors.join(', ') : null;
+    }
+
+    if (name === 'confirmPassword' && formData.password) {
+      if (value && value !== formData.password) {
+        newFieldErrors.confirmPassword = 'Passwords do not match';
+      } else if (value && value === formData.password) {
+        newFieldErrors.confirmPassword = null;
+      }
+    }
+
+    if (name === 'password' && formData.confirmPassword) {
+      if (value !== formData.confirmPassword) {
+        newFieldErrors.confirmPassword = 'Passwords do not match';
+      } else {
+        newFieldErrors.confirmPassword = null;
+      }
+    }
+
+    setFieldErrors(newFieldErrors);
   };
 
   const validateForm = () => {
@@ -45,8 +83,9 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) => {
       return false;
     }
 
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
+    const passwordErrors = validatePassword(formData.password);
+    if (passwordErrors.length > 0) {
+      setError('Password must contain: ' + passwordErrors.join(', '));
       return false;
     }
 
@@ -155,32 +194,72 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) => {
               <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-2">
                 Password
               </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                value={formData.password}
-                onChange={handleChange}
-                className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                placeholder="At least 6 characters"
-                disabled={loading}
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={formData.password}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-3 bg-slate-900/50 border rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:border-transparent transition pr-10 ${
+                    fieldErrors.password ? 'border-red-500 focus:ring-red-500' : 'border-slate-600 focus:ring-blue-500'
+                  }`}
+                  placeholder="At least 6 characters"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-slate-400 hover:text-slate-300 transition"
+                  tabIndex={-1}
+                >
+                  {showPassword ? '✕' : '•'}
+                </button>
+              </div>
+              {fieldErrors.password && (
+                <div className="mt-2 text-xs text-red-400 space-y-1">
+                  <p>Password must contain:</p>
+                  <ul className="list-disc list-inside ml-1">
+                    {fieldErrors.password.split(', ').map((req, idx) => (
+                      <li key={idx}>{req}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
 
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-300 mb-2">
                 Confirm Password
               </label>
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                placeholder="Re-enter your password"
-                disabled={loading}
-              />
+              <div className="relative">
+                <input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-3 bg-slate-900/50 border rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:border-transparent transition pr-10 ${
+                    fieldErrors.confirmPassword ? 'border-red-500 focus:ring-red-500' : 'border-slate-600 focus:ring-blue-500'
+                  }`}
+                  placeholder="Re-enter your password"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-3 text-slate-400 hover:text-slate-300 transition"
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? '✕' : '•'}
+                </button>
+              </div>
+              {formData.confirmPassword && !fieldErrors.confirmPassword && (
+                <p className="mt-2 text-xs text-green-400">Passwords match</p>
+              )}
+              {fieldErrors.confirmPassword && (
+                <p className="mt-2 text-xs text-red-400">{fieldErrors.confirmPassword}</p>
+              )}
             </div>
 
             <button
