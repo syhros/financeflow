@@ -56,6 +56,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          name,
+          username,
+        },
+      },
     });
 
     if (!error && data.user) {
@@ -72,7 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ]);
 
       if (profileError) {
-        return { error: profileError as unknown as AuthError };
+        console.error('Profile creation error:', profileError);
       }
     }
 
