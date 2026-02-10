@@ -532,6 +532,25 @@ export const holdingsService = {
     if (error) throw error;
     return data || [];
   },
+
+  async deleteHolding(holdingId: string) {
+    const { error } = await supabase
+      .from('holdings')
+      .delete()
+      .eq('id', holdingId);
+
+    if (error) throw error;
+  },
+
+  async deleteHoldingByTicker(assetId: string, ticker: string) {
+    const { error } = await supabase
+      .from('holdings')
+      .delete()
+      .eq('asset_id', assetId)
+      .eq('ticker', ticker);
+
+    if (error) throw error;
+  },
 };
 
 // Settings operations

@@ -419,6 +419,10 @@ const App: React.FC = () => {
             const newTx = { ...transaction, id: new Date().toISOString() };
             setTransactions(prev => [newTx, ...prev]);
 
+            if (authUser) {
+                transactionsService.createTransaction(authUser.id, transaction).catch(err => console.error('Failed to add transaction:', err));
+            }
+
             // Decrease source account balance (payment leaving account)
             if (transaction.sourceAccountId) {
                 setAssets(prevAssets => prevAssets.map(asset => {
@@ -453,6 +457,10 @@ const App: React.FC = () => {
 
         const newTx = { ...finalTxData, id: new Date().toISOString() };
         setTransactions(prev => [newTx, ...prev]);
+
+        if (authUser) {
+            transactionsService.createTransaction(authUser.id, finalTxData).catch(err => console.error('Failed to add transaction:', err));
+        }
 
         // Update assets
         setAssets(prevAssets => prevAssets.map(asset => {
@@ -594,6 +602,10 @@ const App: React.FC = () => {
         }
 
         setTransactions(prev => prev.map(t => t.id === updatedTransaction.id ? updatedTransaction : t));
+
+        if (authUser) {
+            transactionsService.updateTransaction(updatedTransaction.id, updatedTransaction).catch(err => console.error('Failed to update transaction:', err));
+        }
     };
 
     const handleDeleteTransaction = (transactionId: string) => {
@@ -619,6 +631,11 @@ const App: React.FC = () => {
                 return debt;
             }));
             setTransactions(prev => prev.filter(t => t.id !== transactionId));
+
+            if (authUser) {
+                transactionsService.deleteTransaction(transactionId).catch(err => console.error('Failed to delete transaction:', err));
+            }
+
             return;
         }
 
@@ -651,8 +668,95 @@ const App: React.FC = () => {
             return debt;
         }));
 
+        // Handle investing transactions
+        if (transaction.type === 'investing' && transaction.ticker) {
+            const accountId = transaction.accountId;
+
+            // Remove the transaction first
+            setTransactions(prev => prev.filter(t => t.id !== transactionId));
+
+            if (authUser) {
+                transactionsService.deleteTransaction(transactionId).catch(err => console.error('Failed to delete transaction:', err));
+            }
+
+            // Recalculate holdings for this account based on remaining transactions
+            setAssets(prevAssets => {
+                const asset = prevAssets.find(a => a.id === accountId);
+                if (!asset || asset.type !== 'Investing') return prevAssets;
+
+                // Get all remaining investing transactions for this account
+                const remainingTxs = transactions.filter(tx =>
+                    tx.id !== transactionId &&
+                    tx.type === 'investing' &&
+                    tx.accountId === accountId
+                );
+
+                // Recalculate holdings from scratch
+                const holdingsMap = new Map<string, any>();
+
+                remainingTxs.forEach(tx => {
+                    if (tx.action === 'dividend' || !tx.ticker) return;
+
+                    let pricePerShare = tx.pricePerShare || (tx.total! / Math.abs(tx.shares!));
+                    const exchangeRate = tx.exchangeRate || 1;
+                    const priceInGBP = pricePerShare * exchangeRate;
+                    const currencyPrice = tx.currencyPrice || 'GBP';
+                    const isPennyStock = currencyPrice === 'GBX';
+
+                    const existing = holdingsMap.get(tx.ticker);
+                    if (existing) {
+                        const currentShares = existing.shares;
+                        const newShares = currentShares + tx.shares!;
+
+                        if (newShares > 0) {
+                            const totalCost = (existing.avgCost * currentShares) + (priceInGBP * tx.shares!);
+                            existing.avgCost = totalCost / newShares;
+                            existing.shares = newShares;
+                        } else if (newShares === 0) {
+                            holdingsMap.delete(tx.ticker);
+                        } else {
+                            existing.shares = newShares;
+                        }
+                    } else if (tx.action === 'buy' && tx.shares! > 0) {
+                        holdingsMap.set(tx.ticker, {
+                            id: `holding-${Date.now()}-${Math.random()}`,
+                            ticker: tx.ticker,
+                            name: tx.name || tx.ticker,
+                            type: 'Stock',
+                            shares: tx.shares,
+                            avgCost: priceInGBP,
+                            currencyPrice: currencyPrice,
+                            isPennyStock: isPennyStock
+                        });
+                    }
+                });
+
+                const updatedAssets = prevAssets.map(a => {
+                    if (a.id !== accountId) return a;
+
+                    const updatedAsset = {
+                        ...a,
+                        holdings: Array.from(holdingsMap.values()).filter(h => h.shares > 0)
+                    };
+
+                    // Sync to database
+                    syncHoldingsToDatabase(updatedAsset);
+
+                    return updatedAsset;
+                });
+
+                return updatedAssets;
+            });
+
+            return;
+        }
+
         // Remove the transaction
         setTransactions(prev => prev.filter(t => t.id !== transactionId));
+
+        if (authUser) {
+            transactionsService.deleteTransaction(transactionId).catch(err => console.error('Failed to delete transaction:', err));
+        }
     };
 
     const handleImportTransactions = (importedTransactions: Transaction[]) => {
@@ -660,6 +764,13 @@ const App: React.FC = () => {
         const bankingTransactions = importedTransactions.filter(tx => tx.type !== 'investing');
 
         setTransactions(prev => [...prev, ...importedTransactions]);
+
+        // Persist imported transactions to database
+        if (authUser) {
+            importedTransactions.forEach(tx => {
+                transactionsService.createTransaction(authUser.id, tx).catch(err => console.error('Failed to import transaction:', err));
+            });
+        }
 
         // Get unique tickers from investing transactions to fetch current prices
         const uniqueTickers = [...new Set(investingTransactions.map(tx => tx.ticker).filter(Boolean))];
@@ -749,10 +860,26 @@ const App: React.FC = () => {
             setAssets(prevAssets => {
                 const tickerMap = getTickerToLondonFlagMap(prevAssets);
                 fetchAndMapMarketData(uniqueTickers, tickerMap).then(mapped => {
-                    setAssets(prevAssets => updateHoldingsFromTxs(prevAssets, mapped));
+                    setAssets(prevAssets => {
+                        const updatedAssets = updateHoldingsFromTxs(prevAssets, mapped);
+                        updatedAssets.forEach(asset => {
+                            if (asset.type === 'Investing') {
+                                syncHoldingsToDatabase(asset);
+                            }
+                        });
+                        return updatedAssets;
+                    });
                 }).catch(err => {
                     console.error('Failed to fetch market data:', err);
-                    setAssets(prevAssets => updateHoldingsFromTxs(prevAssets));
+                    setAssets(prevAssets => {
+                        const updatedAssets = updateHoldingsFromTxs(prevAssets);
+                        updatedAssets.forEach(asset => {
+                            if (asset.type === 'Investing') {
+                                syncHoldingsToDatabase(asset);
+                            }
+                        });
+                        return updatedAssets;
+                    });
                 });
 
                 return prevAssets;
@@ -803,8 +930,8 @@ const App: React.FC = () => {
         const assetName = marketData[tx.ticker!]?.name || tx.ticker!;
         const tickerNameForLogo = tx.ticker!.split('-')[0].toLowerCase();
 
-        const newTx = { 
-            ...tx, 
+        const newTx = {
+            ...tx,
             id: new Date().toISOString(),
             logo: `https://logo.clearbit.com/${tickerNameForLogo}.com`,
             merchant: `${assetName} (${tx.ticker})`,
@@ -812,6 +939,10 @@ const App: React.FC = () => {
         };
 
         setTransactions(prev => [newTx, ...prev]);
+
+        if (authUser) {
+            transactionsService.createTransaction(authUser.id, tx).catch(err => console.error('Failed to add transaction:', err));
+        }
 
         setAssets(prevAssets => {
             const newAssets = [...prevAssets];
@@ -839,6 +970,9 @@ const App: React.FC = () => {
                         avgCost: tx.purchasePrice!
                     });
                 }
+
+                // Sync holdings to database
+                syncHoldingsToDatabase(investmentAccount);
             }
             return newAssets;
         });
@@ -878,6 +1012,33 @@ const App: React.FC = () => {
             }));
         } catch (err) {
             console.error('Failed to update holding:', err);
+        }
+    };
+
+    const syncHoldingsToDatabase = async (asset: Asset) => {
+        if (asset.type !== 'Investing' || !asset.holdings) return;
+
+        try {
+            for (const holding of asset.holdings) {
+                if (holding.shares > 0) {
+                    const dbUpdates: Record<string, any> = {
+                        name: holding.name,
+                        type: holding.type,
+                        shares: holding.shares,
+                        avg_cost: holding.avgCost,
+                    };
+                    if (holding.icon) dbUpdates.icon = holding.icon;
+                    if (holding.isLondonListed !== undefined) dbUpdates.is_london_listed = holding.isLondonListed;
+                    if (holding.isPennyStock !== undefined) dbUpdates.is_penny_stock = holding.isPennyStock;
+                    if (holding.currencyPrice) dbUpdates.currency_price = holding.currencyPrice;
+
+                    await holdingsService.upsertByTicker(asset.id, holding.ticker, dbUpdates);
+                } else {
+                    await holdingsService.deleteHoldingByTicker(asset.id, holding.ticker);
+                }
+            }
+        } catch (err) {
+            console.error('Failed to sync holdings to database:', err);
         }
     };
 
