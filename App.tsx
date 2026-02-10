@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, createContext, useContext, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, createContext, useContext, useMemo, useRef } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import AuthContainer from './components/auth/AuthContainer';
 import LoadingSpinner from './components/shared/LoadingSpinner';
@@ -89,6 +89,8 @@ const App: React.FC = () => {
 
     const [marketData, setMarketData] = useState<MarketData>({});
     const [isDataLoading, setIsDataLoading] = useState(false);
+    const lastMarketDataFetch = useRef<number>(0);
+    const MARKET_DATA_THROTTLE_MS = 3600000;
 
     // --- Interactive Notification State ---
     const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
@@ -183,13 +185,15 @@ const App: React.FC = () => {
         return new Intl.NumberFormat(locale, options).format(amount);
     }, [currency]);
 
-    // Memoize tickers to prevent unnecessary API calls
+    // Memoize tickers to prevent unnecessary API calls (only holdings with >0.1 shares)
     const investmentTickerInfo = useMemo(() => {
         const tickerMap: Record<string, boolean> = {};
         assets
             .filter(a => a.type === 'Investing' && a.holdings)
             .forEach(a => a.holdings!.forEach(h => {
-                tickerMap[h.ticker] = h.isLondonListed || false;
+                if (Math.abs(h.shares) > 0.1) {
+                    tickerMap[h.ticker] = h.isLondonListed || false;
+                }
             }));
         return tickerMap;
     }, [assets]);
@@ -198,14 +202,22 @@ const App: React.FC = () => {
         return JSON.stringify(Object.keys(investmentTickerInfo).sort());
     }, [investmentTickerInfo]);
 
-    // Fetch market data only when tickers change
+    // Fetch market data only when tickers change (throttled to 1 hour)
     useEffect(() => {
         const uniqueTickers: string[] = JSON.parse(investmentTickersJson);
-        if (uniqueTickers.length > 0) {
-            fetchAndMapMarketData(uniqueTickers, investmentTickerInfo).then(mapped => {
-                setMarketData(prev => ({ ...prev, ...mapped }));
-            });
+        if (uniqueTickers.length === 0) return;
+
+        const now = Date.now();
+        const timeSinceLastFetch = now - lastMarketDataFetch.current;
+
+        if (timeSinceLastFetch < MARKET_DATA_THROTTLE_MS) {
+            return;
         }
+
+        lastMarketDataFetch.current = now;
+        fetchAndMapMarketData(uniqueTickers, investmentTickerInfo).then(mapped => {
+            setMarketData(prev => ({ ...prev, ...mapped }));
+        });
     }, [investmentTickersJson, investmentTickerInfo]);
 
     // Notification Generation

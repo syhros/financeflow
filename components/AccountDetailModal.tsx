@@ -122,6 +122,10 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
         return { totalIncome, totalExpenses, netChange };
     }, [accountTransactions, accountType, isInvestingAccount, account, marketData]);
 
+    if (!isOpen) return null;
+
+    const asset = account as Asset;
+
     const activeHoldings = useMemo(() => {
         if (!asset.holdings) return [];
         return asset.holdings
@@ -142,10 +146,6 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
     const paginatedActiveHoldings = useMemo(() => {
         return activeHoldings.slice((holdingsPage - 1) * holdingsPerPage, holdingsPage * holdingsPerPage);
     }, [activeHoldings, holdingsPage, holdingsPerPage]);
-
-    if (!isOpen) return null;
-
-    const asset = account as Asset;
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4" onClick={onClose}>
