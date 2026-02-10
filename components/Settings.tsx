@@ -538,7 +538,11 @@ const WipeDataModal: React.FC<{ isOpen: boolean; onClose: () => void; onWipe: (o
     const [selectedOption, setSelectedOption] = useState('');
     const [confirmText, setConfirmText] = useState('');
 
+    const isRestoreOption = selectedOption === 'restoreDefaultCategories';
+    const destructiveOptions = ['allTransactions', 'oldTransactions', 'resetAccounts', 'deleteAndResetBalances', 'fullReset'];
+
     const options = [
+        { id: 'restoreDefaultCategories', label: 'Restore default categories', description: 'Adds all default categories. Your custom categories and data remain unchanged.' },
         { id: 'allTransactions', label: 'Delete all transactions', description: 'Removes every transaction record.' },
         { id: 'oldTransactions', label: 'Delete old transactions', description: 'Removes transactions older than 6 months.' },
         { id: 'resetAccounts', label: 'Reset all accounts', description: 'Sets all asset and debt balances to £0 (accounts remain).' },
@@ -547,7 +551,14 @@ const WipeDataModal: React.FC<{ isOpen: boolean; onClose: () => void; onWipe: (o
     ];
 
     const handleNext = () => {
-        if (selectedOption) setStep(2);
+        if (selectedOption) {
+            if (isRestoreOption) {
+                onWipe(selectedOption);
+                onClose();
+            } else {
+                setStep(2);
+            }
+        }
     };
 
     const handleWipe = () => {
@@ -571,18 +582,21 @@ const WipeDataModal: React.FC<{ isOpen: boolean; onClose: () => void; onWipe: (o
                 <div className="p-6">
                     {step === 1 && (
                         <div className="space-y-4">
-                            <p className="text-gray-300">Select an option below to permanently delete data. This action cannot be undone.</p>
-                            {options.map(opt => (
-                                <label key={opt.id} className={`flex items-center p-4 rounded-lg cursor-pointer transition-all ${selectedOption === opt.id ? 'bg-red-500/20 ring-2 ring-red-400' : 'bg-gray-800 hover:bg-gray-700'}`}>
-                                    <input type="radio" name="wipe-option" value={opt.id} checked={selectedOption === opt.id} onChange={() => setSelectedOption(opt.id)} className="h-4 w-4 text-primary bg-gray-700 border-gray-600 focus:ring-primary" />
-                                    <div className="ml-4">
-                                        <p className="font-semibold text-white">{opt.label}</p>
-                                        <p className="text-xs text-gray-400">{opt.description}</p>
-                                    </div>
-                                </label>
-                            ))}
-                            <button onClick={handleNext} disabled={!selectedOption} className="w-full py-3 mt-4 bg-red-600 text-white rounded-full font-semibold hover:bg-red-500 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors">
-                                Next Step
+                            <p className="text-gray-300">{isRestoreOption ? 'Select an option to restore or modify your data.' : 'Select an option below to permanently delete data. This action cannot be undone.'}</p>
+                            {options.map(opt => {
+                                const isDestructive = destructiveOptions.includes(opt.id);
+                                return (
+                                    <label key={opt.id} className={`flex items-center p-4 rounded-lg cursor-pointer transition-all ${selectedOption === opt.id ? (isDestructive ? 'bg-red-500/20 ring-2 ring-red-400' : 'bg-green-500/20 ring-2 ring-green-400') : 'bg-gray-800 hover:bg-gray-700'}`}>
+                                        <input type="radio" name="wipe-option" value={opt.id} checked={selectedOption === opt.id} onChange={() => setSelectedOption(opt.id)} className="h-4 w-4 text-primary bg-gray-700 border-gray-600 focus:ring-primary" />
+                                        <div className="ml-4">
+                                            <p className="font-semibold text-white">{opt.label}</p>
+                                            <p className="text-xs text-gray-400">{opt.description}</p>
+                                        </div>
+                                    </label>
+                                );
+                            })}
+                            <button onClick={handleNext} disabled={!selectedOption} className={`w-full py-3 mt-4 rounded-full font-semibold transition-colors ${isRestoreOption ? 'bg-green-600 hover:bg-green-500' : 'bg-red-600 hover:bg-red-500'} text-white disabled:bg-gray-600 disabled:cursor-not-allowed`}>
+                                {isRestoreOption ? 'Restore' : 'Next Step'}
                             </button>
                         </div>
                     )}

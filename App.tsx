@@ -750,6 +750,24 @@ const App: React.FC = () => {
     // Data Wipe Handler
     const handleWipeData = (option: string) => {
         switch (option) {
+            case 'restoreDefaultCategories':
+                // Add missing default categories while preserving existing ones
+                const existingCategoryNames = new Set(categories.map(c => c.name));
+                const defaultCatNames = new Set(mockCategories.map(c => c.name));
+                const categoriesToAdd = mockCategories.filter(cat => !existingCategoryNames.has(cat.name));
+
+                if (categoriesToAdd.length > 0) {
+                    const maxId = categories.length > 0 ? Math.max(...categories.map(c => parseInt(c.id) || 0)) : 0;
+                    const newCategories = categoriesToAdd.map((cat, idx) => ({
+                        ...cat,
+                        id: (maxId + idx + 1).toString()
+                    }));
+                    setCategories(prev => [...prev, ...newCategories]);
+                    alert(`Added ${categoriesToAdd.length} default categories!`);
+                } else {
+                    alert("All default categories are already present.");
+                }
+                break;
             case 'allTransactions':
                 setTransactions([]);
                 alert("All transactions have been deleted.");
