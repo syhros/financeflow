@@ -241,6 +241,7 @@ const App: React.FC = () => {
 
         setAssets(prevAssets => {
             let needsUpdate = false;
+            const assetsToUpdate: Asset[] = [];
             const newAssets = prevAssets.map(asset => {
                 if (asset.type === 'Investing' && asset.holdings) {
                     const newBalance = asset.holdings.reduce((total, holding) => {
@@ -256,11 +257,22 @@ const App: React.FC = () => {
                     // Compare balances with a tolerance for floating point issues
                     if (Math.abs(asset.balance - newBalance) > 0.01) {
                         needsUpdate = true;
-                        return { ...asset, balance: newBalance };
+                        const updatedAsset = { ...asset, balance: newBalance };
+                        assetsToUpdate.push(updatedAsset);
+                        return updatedAsset;
                     }
                 }
                 return asset;
             });
+
+            // Update balances in database
+            if (assetsToUpdate.length > 0 && authUser) {
+                assetsToUpdate.forEach(asset => {
+                    assetsService.updateAsset(asset.id, { balance: asset.balance }).catch(err =>
+                        console.error('Failed to update asset balance:', err)
+                    );
+                });
+            }
 
             // Only return new array if something actually changed to prevent re-render loop
             return needsUpdate ? newAssets : prevAssets;
@@ -698,22 +710,29 @@ const App: React.FC = () => {
                     if (tx.action === 'dividend' || !tx.ticker) return;
 
                     let pricePerShare = tx.pricePerShare || (tx.total! / Math.abs(tx.shares!));
-                    const exchangeRate = tx.exchangeRate || 1;
-                    const priceInGBP = pricePerShare * exchangeRate;
                     const currencyPrice = tx.currencyPrice || 'GBP';
                     const isPennyStock = currencyPrice === 'GBX';
+
+                    // Convert GBX to GBP by dividing by 100
+                    if (isPennyStock) {
+                        pricePerShare = pricePerShare / 100;
+                    }
+
+                    const exchangeRate = tx.exchangeRate || 1;
+                    const priceInGBP = pricePerShare * exchangeRate;
 
                     const existing = holdingsMap.get(tx.ticker);
                     if (existing) {
                         const currentShares = existing.shares;
                         const newShares = currentShares + tx.shares!;
 
-                        if (newShares > 0) {
+                        // Treat shares within floating point precision as zero
+                        if (Math.abs(newShares) < 0.0001) {
+                            holdingsMap.delete(tx.ticker);
+                        } else if (newShares > 0) {
                             const totalCost = (existing.avgCost * currentShares) + (priceInGBP * tx.shares!);
                             existing.avgCost = totalCost / newShares;
                             existing.shares = newShares;
-                        } else if (newShares === 0) {
-                            holdingsMap.delete(tx.ticker);
                         } else {
                             existing.shares = newShares;
                         }
@@ -736,7 +755,7 @@ const App: React.FC = () => {
 
                     const updatedAsset = {
                         ...a,
-                        holdings: Array.from(holdingsMap.values()).filter(h => h.shares > 0)
+                        holdings: Array.from(holdingsMap.values()).filter(h => h.shares > 0.0001)
                     };
 
                     // Sync to database
@@ -792,27 +811,33 @@ const App: React.FC = () => {
                         const existingHoldingIndex = updatedAsset.holdings.findIndex(h => h.ticker === tx.ticker);
                         let pricePerShare = tx.pricePerShare || (tx.total! / Math.abs(tx.shares!));
 
-                        // Apply exchange rate conversion to get price in GBP
-                        const exchangeRate = tx.exchangeRate || 1;
-                        const priceInGBP = pricePerShare * exchangeRate;
-
                         // Auto-detect penny stock from currency
                         const currencyPrice = tx.currencyPrice || 'GBP';
                         const isPennyStock = currencyPrice === 'GBX';
+
+                        // Convert GBX to GBP by dividing by 100
+                        if (isPennyStock) {
+                            pricePerShare = pricePerShare / 100;
+                        }
+
+                        // Apply exchange rate conversion to get price in GBP
+                        const exchangeRate = tx.exchangeRate || 1;
+                        const priceInGBP = pricePerShare * exchangeRate;
 
                         if (existingHoldingIndex > -1) {
                             const existingHolding = updatedAsset.holdings[existingHoldingIndex];
                             const currentShares = existingHolding.shares;
                             const newShares = currentShares + tx.shares!;
 
-                            if (newShares > 0) {
+                            // Treat shares within floating point precision as zero
+                            if (Math.abs(newShares) < 0.0001) {
+                                updatedAsset.holdings.splice(existingHoldingIndex, 1);
+                            } else if (newShares > 0) {
                                 const totalCost = (existingHolding.avgCost * currentShares) + (priceInGBP * tx.shares!);
                                 existingHolding.avgCost = totalCost / newShares;
                                 existingHolding.shares = newShares;
-                            } else if (newShares < 0) {
-                                existingHolding.shares = newShares;
                             } else {
-                                updatedAsset.holdings.splice(existingHoldingIndex, 1);
+                                existingHolding.shares = newShares;
                             }
 
                             // Update currency info if not set
@@ -1020,7 +1045,8 @@ const App: React.FC = () => {
 
         try {
             for (const holding of asset.holdings) {
-                if (holding.shares > 0) {
+                // Treat shares within floating point precision as zero
+                if (holding.shares > 0.0001) {
                     const dbUpdates: Record<string, any> = {
                         name: holding.name,
                         type: holding.type,
@@ -1037,6 +1063,17 @@ const App: React.FC = () => {
                     await holdingsService.deleteHoldingByTicker(asset.id, holding.ticker);
                 }
             }
+
+            // Calculate and update account balance
+            const newBalance = asset.holdings.reduce((total, holding) => {
+                if (holding.shares > 0.0001) {
+                    const currentPrice = holding.currentPrice || holding.avgCost || 0;
+                    return total + (currentPrice * holding.shares);
+                }
+                return total;
+            }, 0);
+
+            await assetsService.updateAsset(asset.id, { balance: newBalance });
         } catch (err) {
             console.error('Failed to sync holdings to database:', err);
         }

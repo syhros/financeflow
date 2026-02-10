@@ -17,11 +17,19 @@ export function getLatestTransactionPrice(ticker: string, transactions: Transact
   if (relevantTransactions.length === 0) return null;
 
   const latestTx = relevantTransactions[0];
-  const pricePerShare = latestTx.pricePerShare || (latestTx.total && latestTx.shares ? latestTx.total / Math.abs(latestTx.shares) : null);
+  let pricePerShare = latestTx.pricePerShare || (latestTx.total && latestTx.shares ? latestTx.total / Math.abs(latestTx.shares) : null);
+
+  if (!pricePerShare) return null;
+
+  // Convert GBX to GBP by dividing by 100
+  const currencyPrice = latestTx.currencyPrice || 'GBP';
+  if (currencyPrice === 'GBX') {
+    pricePerShare = pricePerShare / 100;
+  }
 
   // Apply exchange rate conversion if needed
-  if (pricePerShare && latestTx.exchangeRate) {
-    return pricePerShare * latestTx.exchangeRate;
+  if (latestTx.exchangeRate) {
+    pricePerShare = pricePerShare * latestTx.exchangeRate;
   }
 
   return pricePerShare;
