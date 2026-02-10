@@ -29,7 +29,7 @@ const CreateRuleModal: React.FC<{
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4" onClick={onDecline}>
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-[9999] flex items-center justify-center p-4" onClick={onDecline}>
             <div className="bg-card-bg rounded-lg shadow-xl w-full max-w-md border border-border-color" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center p-4 border-b border-border-color">
                     <h2 className="text-xl font-bold text-white">Create a Rule?</h2>
