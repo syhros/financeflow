@@ -132,20 +132,35 @@ const App: React.FC = () => {
                         if (asset.type === 'Investing' && asset.holdings && asset.holdings.length > 0) {
                             const metadata = await holdingsService.getHoldingsMetadata(asset.id);
                             const metadataMap = new Map(metadata.map((m: any) => [m.ticker, m]));
-                            return {
+                            const holdings = asset.holdings.map((h: any) => {
+                                const meta = metadataMap.get(h.ticker);
+                                const currencyPrice = meta?.currency_price || h.currencyPrice || 'GBP';
+                                const isPennyStock = meta?.is_penny_stock ?? (currencyPrice === 'GBX');
+                                const isLondonListed = meta?.is_london_listed ?? isPennyStock;
+
+                                return {
+                                    ...h,
+                                    id: meta?.id || h.id,
+                                    icon: meta?.icon || h.icon,
+                                    isLondonListed,
+                                    isPennyStock,
+                                    currencyPrice,
+                                };
+                            });
+
+                            const updatedAsset = {
                                 ...asset,
-                                holdings: asset.holdings.map((h: any) => {
-                                    const meta = metadataMap.get(h.ticker);
-                                    return {
-                                        ...h,
-                                        id: meta?.id || h.id,
-                                        icon: meta?.icon || h.icon,
-                                        isLondonListed: meta?.is_london_listed || false,
-                                        isPennyStock: meta?.is_penny_stock || false,
-                                        currencyPrice: meta?.currency_price || h.currencyPrice,
-                                    };
-                                })
+                                holdings
                             };
+
+                            // Sync corrected flags to database
+                            if (holdings.some(h => h.isPennyStock || h.isLondonListed)) {
+                                syncHoldingsToDatabase(updatedAsset).catch(err =>
+                                    console.error('Failed to sync holdings on load:', err)
+                                );
+                            }
+
+                            return updatedAsset;
                         }
                         return asset;
                     }));
@@ -712,6 +727,7 @@ const App: React.FC = () => {
                     let pricePerShare = tx.pricePerShare || (tx.total! / Math.abs(tx.shares!));
                     const currencyPrice = tx.currencyPrice || 'GBP';
                     const isPennyStock = currencyPrice === 'GBX';
+                    const isLondonListed = isPennyStock;
 
                     // Convert GBX to GBP by dividing by 100
                     if (isPennyStock) {
@@ -745,7 +761,8 @@ const App: React.FC = () => {
                             shares: tx.shares,
                             avgCost: priceInGBP,
                             currencyPrice: currencyPrice,
-                            isPennyStock: isPennyStock
+                            isPennyStock: isPennyStock,
+                            isLondonListed: isLondonListed
                         });
                     }
                 });
@@ -814,6 +831,7 @@ const App: React.FC = () => {
                         // Auto-detect penny stock from currency
                         const currencyPrice = tx.currencyPrice || 'GBP';
                         const isPennyStock = currencyPrice === 'GBX';
+                        const isLondonListed = isPennyStock;
 
                         // Convert GBX to GBP by dividing by 100
                         if (isPennyStock) {
@@ -843,6 +861,7 @@ const App: React.FC = () => {
                             // Update currency info if not set
                             if (!existingHolding.currencyPrice) existingHolding.currencyPrice = currencyPrice;
                             if (existingHolding.isPennyStock === undefined) existingHolding.isPennyStock = isPennyStock;
+                            if (existingHolding.isLondonListed === undefined) existingHolding.isLondonListed = isLondonListed;
                         } else if (tx.action === 'buy' && tx.shares! > 0) {
                             updatedAsset.holdings.push({
                                 id: `holding-${Date.now()}-${Math.random()}`,
@@ -852,7 +871,8 @@ const App: React.FC = () => {
                                 shares: tx.shares!,
                                 avgCost: priceInGBP,
                                 currencyPrice: currencyPrice,
-                                isPennyStock: isPennyStock
+                                isPennyStock: isPennyStock,
+                                isLondonListed: isLondonListed
                             });
                         }
                     });
@@ -1052,11 +1072,11 @@ const App: React.FC = () => {
                         type: holding.type,
                         shares: holding.shares,
                         avg_cost: holding.avgCost,
+                        is_london_listed: holding.isLondonListed ?? false,
+                        is_penny_stock: holding.isPennyStock ?? false,
+                        currency_price: holding.currencyPrice || 'GBP'
                     };
                     if (holding.icon) dbUpdates.icon = holding.icon;
-                    if (holding.isLondonListed !== undefined) dbUpdates.is_london_listed = holding.isLondonListed;
-                    if (holding.isPennyStock !== undefined) dbUpdates.is_penny_stock = holding.isPennyStock;
-                    if (holding.currencyPrice) dbUpdates.currency_price = holding.currencyPrice;
 
                     await holdingsService.upsertByTicker(asset.id, holding.ticker, dbUpdates);
                 } else {
