@@ -3,6 +3,7 @@ import { Asset, Debt, Transaction, MarketData } from '../types';
 import { CloseIcon } from './icons';
 import { format } from 'date-fns';
 import { useCurrency } from '../App';
+import { transactionsService } from '../services/database';
 
 interface AccountDetailModalProps {
     isOpen: boolean;
@@ -349,12 +350,21 @@ const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ isOpen, onClose
                                     Cancel
                                 </button>
                                 <button
-                                    onClick={() => {
+                                    onClick={async () => {
                                         if (holdingIconUrl && editingHoldingTicker && onUpdateTransactions) {
                                             const updatedTransactions = transactions.map(tx =>
                                                 tx.ticker === editingHoldingTicker ? { ...tx, logo: holdingIconUrl } : tx
                                             );
                                             onUpdateTransactions(updatedTransactions);
+
+                                            const matchingTransactions = transactions.filter(tx => tx.ticker === editingHoldingTicker);
+                                            for (const tx of matchingTransactions) {
+                                                try {
+                                                    await transactionsService.updateTransaction(tx.id, { logo: holdingIconUrl });
+                                                } catch (error) {
+                                                    console.error('Failed to save icon for transaction:', error);
+                                                }
+                                            }
                                         }
                                         setEditingHoldingTicker(null);
                                         setHoldingIconUrl('');
