@@ -291,9 +291,8 @@ export const ProfileModal: React.FC<{
                     </div>
                 </div>
                  <div className="p-4">
-                    <button onClick={async () => {
-                        await signOut();
-                        onClose();
+                    <button onClick={() => {
+                        signOut();
                     }} className="w-full py-3 bg-red-600/20 text-red-400 rounded-lg font-semibold hover:bg-red-600/40 transition-colors">
                         Logout
                     </button>
