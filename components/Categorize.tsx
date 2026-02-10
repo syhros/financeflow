@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Card from './Card';
 import { Transaction, Asset, Debt, Category } from '../types';
 import { format } from 'date-fns';
@@ -49,7 +49,6 @@ const CreateRuleModal: React.FC<{
     );
 };
 
-
 const getSuggestions = (tx: Transaction | undefined) => {
     if (!tx) return { suggestedMerchant: '', suggestedCategory: '' };
     let suggestedMerchant = tx.merchant.split(' ')[0].charAt(0).toUpperCase() + tx.merchant.split(' ')[0].slice(1).toLowerCase();
@@ -68,7 +67,6 @@ const getSuggestions = (tx: Transaction | undefined) => {
     }
     if (tx.merchant.toLowerCase().includes('cineworld')) { suggestedCategory = 'Entertainment'; suggestedMerchant = 'Cineworld'; }
 
-
     return { suggestedMerchant, suggestedCategory };
 };
 
@@ -80,19 +78,23 @@ const Categorize: React.FC<CategorizeProps> = ({ transactions: uncategorizedTxs,
     const [cardAnimation, setCardAnimation] = useState('');
     const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
     const [pendingCategorization, setPendingCategorization] = useState<{ merchant: string; category: string; } | null>(null);
+    const [dragOffset, setDragOffset] = useState(0);
+    const [isDragging, setIsDragging] = useState(false);
+    const cardStackRef = useRef<HTMLDivElement>(null);
+    const startXRef = useRef(0);
 
     const { formatCurrency } = useCurrency();
 
     const allAccounts = useMemo(() => [...assets, ...debts], [assets, debts]);
-    const currentTx = useMemo(() => uncategorizedTxs[currentIndex], [uncategorizedTxs, currentIndex]);
-    
+    const currentTx = uncategorizedTxs[currentIndex] || null;
+
     const currentAccountName = useMemo(() => {
         if (!currentTx) return '';
         const account = allAccounts.find(acc => acc.id === currentTx.accountId);
         return account?.name || 'Unknown Account';
     }, [currentTx, allAccounts]);
-    
-    const { suggestedMerchant, suggestedCategory } = useMemo(() => getSuggestions(currentTx), [currentTx]);
+
+    const { suggestedMerchant, suggestedCategory } = useMemo(() => getSuggestions(currentTx || undefined), [currentTx]);
 
     useEffect(() => {
         if (currentTx) {
@@ -102,31 +104,69 @@ const Categorize: React.FC<CategorizeProps> = ({ transactions: uncategorizedTxs,
     }, [currentTx, suggestedMerchant, suggestedCategory]);
 
     const advanceCard = () => {
-        setCurrentIndex(prev => prev + 1);
+        setCurrentIndex(prev => Math.min(prev + 1, uncategorizedTxs.length));
         setCardAnimation('');
         setIsEditing(false);
-    };
-    
-    const handleSwipe = (direction: 'right' | 'left') => {
-        if (currentIndex >= uncategorizedTxs.length) return;
-        const animationClass = direction === 'right'
-            ? 'translate-x-full rotate-12 opacity-0'
-            : '-translate-x-full -rotate-12 opacity-0';
-
-        setCardAnimation(animationClass);
-
-        setTimeout(() => {
-            advanceCard();
-        }, 300);
+        setDragOffset(0);
     };
 
-    const handleAccept = () => {
+    const handlePointerDown = (e: React.PointerEvent) => {
+        if (!cardStackRef.current || isEditing) return;
+        setIsDragging(true);
+        startXRef.current = e.clientX;
+    };
+
+    const handlePointerMove = (e: React.PointerEvent) => {
+        if (!isDragging || !cardStackRef.current) return;
+        const delta = e.clientX - startXRef.current;
+        setDragOffset(delta);
+    };
+
+    const handlePointerUp = (e: React.PointerEvent) => {
+        if (!isDragging) return;
+        setIsDragging(false);
+
+        const threshold = 100;
+        const delta = dragOffset;
+
+        if (Math.abs(delta) > threshold) {
+            const direction = Math.sign(delta);
+            if (direction > 0) {
+                handleAcceptCard();
+            } else {
+                handleRejectCard();
+            }
+        } else {
+            setDragOffset(0);
+        }
+    };
+
+    const handleAcceptCard = () => {
         if (!currentTx) return;
         const merchantToSave = isEditing ? editedMerchant : suggestedMerchant;
         const categoryToSave = isEditing ? editedCategory : suggestedCategory;
 
         setPendingCategorization({ merchant: merchantToSave, category: categoryToSave });
         setIsRuleModalOpen(true);
+        setCardAnimation('translate-x-full rotate-12 opacity-0');
+
+        setTimeout(() => {
+            advanceCard();
+        }, 300);
+    };
+
+    const handleRejectCard = () => {
+        if (isEditing) {
+            setIsEditing(false);
+            setEditedMerchant(suggestedMerchant);
+            setEditedCategory(suggestedCategory);
+            setDragOffset(0);
+        } else {
+            setCardAnimation('-translate-x-full -rotate-12 opacity-0');
+            setTimeout(() => {
+                advanceCard();
+            }, 300);
+        }
     };
 
     const processTransactionAndAnimate = () => {
@@ -138,16 +178,10 @@ const Categorize: React.FC<CategorizeProps> = ({ transactions: uncategorizedTxs,
             merchant: pendingCategorization.merchant,
             logo: `https://logo.clearbit.com/${pendingCategorization.merchant.toLowerCase().replace(/ /g, '')}.com`
         });
-        
-        const animationClass = 'translate-x-full rotate-12 opacity-0';
-        setCardAnimation(animationClass);
 
-        setTimeout(() => {
-            advanceCard();
-            setPendingCategorization(null);
-        }, 300);
+        setPendingCategorization(null);
     };
-    
+
     const handleCreateRule = () => {
         if (pendingCategorization && currentTx) {
             onAddRule({
@@ -166,13 +200,7 @@ const Categorize: React.FC<CategorizeProps> = ({ transactions: uncategorizedTxs,
     };
 
     const handleReject = () => {
-        if (isEditing) {
-            setIsEditing(false);
-            setEditedMerchant(suggestedMerchant);
-            setEditedCategory(suggestedCategory);
-        } else {
-            handleSwipe('left');
-        }
+        handleRejectCard();
     };
 
     const handleEditClick = () => {
@@ -182,6 +210,9 @@ const Categorize: React.FC<CategorizeProps> = ({ transactions: uncategorizedTxs,
     const totalTransactions = uncategorizedTxs.length;
     const completedTransactions = currentIndex;
     const progress = totalTransactions > 0 ? (completedTransactions / totalTransactions) * 100 : 100;
+
+    const overlayOpacity = dragOffset !== 0 ? Math.min(Math.abs(dragOffset) / 150, 0.5) : 0;
+    const isSwipingRight = dragOffset > 0;
 
     return (
         <>
@@ -197,74 +228,97 @@ const Categorize: React.FC<CategorizeProps> = ({ transactions: uncategorizedTxs,
                     <h2 className="text-2xl font-semibold text-white">Uncategorised Transactions</h2>
                     <p className="text-gray-500">Swipe or tap to sort</p>
                 </div>
-                
-                 <div className="relative w-full max-w-sm h-80 mb-12">
-                     {uncategorizedTxs.map((tx, index) => {
-                        const position = index - currentIndex;
-                        if (position < 0 || position > 2) {
-                            return null;
-                        }
 
-                        const isTopCard = position === 0;
-                        const cardClasses = [
-                            'z-30', // Top card
-                            'transform scale-95 -translate-y-4 -rotate-3 z-20', // Middle card
-                            'transform scale-90 -translate-y-8 -rotate-6 z-10' // Back card
-                        ];
-                        
-                        return (
-                            <Card
-                                key={tx.id}
-                                className={`absolute w-full h-80 flex flex-col justify-between items-center text-center transition-all duration-300 ease-in-out ${cardClasses[position]} ${isTopCard ? cardAnimation : ''}`}
-                            >
-                                {isTopCard ? (
+                <div
+                    ref={cardStackRef}
+                    className="relative w-full max-w-sm h-96 mb-12 touch-none"
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerLeave={handlePointerUp}
+                >
+                    {currentTx && (
+                        <Card
+                            className={`absolute w-full h-96 flex flex-col justify-between items-center text-center transition-all duration-300 ease-in-out z-30 ${cardAnimation}`}
+                            style={{
+                                transform: isDragging ? `translateX(${dragOffset}px) rotateY(${dragOffset * 0.1}deg)` : undefined,
+                            }}
+                        >
+                            <div className="absolute inset-0 rounded-2xl pointer-events-none overflow-hidden">
+                                {isDragging && (
                                     <>
-                                        <div>
-                                            <p className="text-sm text-gray-400">{currentAccountName}</p>
-                                            <p className="text-6xl font-bold text-white my-2">{formatCurrency(tx.amount)}</p>
-                                            <p className="text-lg text-gray-300">{tx.merchant}</p>
-                                        </div>
-                                        {isEditing ? (
-                                            <div className="w-full px-4">
-                                                <input
-                                                    type="text"
-                                                    value={editedMerchant}
-                                                    onChange={(e) => setEditedMerchant(e.target.value)}
-                                                    className="w-full bg-gray-700 text-white text-center rounded-lg px-3 py-2 border border-gray-600 focus:border-primary outline-none transition-colors"
-                                                    placeholder="Merchant Name"
-                                                />
-                                                <select
-                                                    value={editedCategory}
-                                                    onChange={(e) => setEditedCategory(e.target.value)}
-                                                    className="w-full bg-gray-700 text-white text-center rounded-lg px-3 py-2 border border-gray-600 focus:border-primary outline-none transition-colors mt-2"
-                                                >
-                                                    <option value="">Select Category</option>
-                                                    {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                                                </select>
-                                            </div>
-                                        ) : (
-                                            <div>
-                                                <p className="text-sm font-semibold text-primary">Suggested Merchant: {suggestedMerchant}</p>
-                                                <p className="text-sm font-semibold mt-1 text-primary">Suggested Category: {suggestedCategory}</p>
-                                            </div>
+                                        {isSwipingRight && (
+                                            <div
+                                                className="absolute inset-0 bg-green-500 transition-opacity"
+                                                style={{ opacity: overlayOpacity }}
+                                            />
                                         )}
-                                        <p className="text-xs text-gray-500">{format(new Date(tx.date), 'dd MMM yyyy')}</p>
+                                        {!isSwipingRight && (
+                                            <div
+                                                className="absolute inset-0 bg-red-500 transition-opacity"
+                                                style={{ opacity: overlayOpacity }}
+                                            />
+                                        )}
                                     </>
-                                ) : (
-                                    // Empty card content for stacked cards
-                                    <div/>
                                 )}
-                            </Card>
-                        );
-                     })}
-                     {currentIndex >= uncategorizedTxs.length && (
-                         <Card className="w-full h-80 flex flex-col justify-center items-center text-center absolute z-10">
+                            </div>
+
+                            <div className="relative z-10">
+                                <p className="text-sm text-gray-400">{currentAccountName}</p>
+                                <p className="text-6xl font-bold text-white my-2">{formatCurrency(currentTx.amount)}</p>
+
+                                <div className="flex items-center justify-center gap-3 mt-3 mb-2">
+                                    {currentTx.type === 'income' ? (
+                                        <div className="bg-green-500/20 px-3 py-1 rounded-full">
+                                            <span className="text-sm font-semibold text-green-300">Income</span>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-red-500/20 px-3 py-1 rounded-full">
+                                            <span className="text-sm font-semibold text-red-300">Expense</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <p className="text-lg text-gray-300">{currentTx.merchant}</p>
+                            </div>
+
+                            {isEditing ? (
+                                <div className="relative z-10 w-full px-4 pb-4 space-y-3">
+                                    <input
+                                        type="text"
+                                        value={editedMerchant}
+                                        onChange={(e) => setEditedMerchant(e.target.value)}
+                                        className="w-full bg-gray-700 text-white text-center rounded-lg px-3 py-2 border border-gray-600 focus:border-primary outline-none transition-colors"
+                                        placeholder="Merchant Name"
+                                    />
+                                    <select
+                                        value={editedCategory}
+                                        onChange={(e) => setEditedCategory(e.target.value)}
+                                        className="w-full bg-gray-700 text-white text-center rounded-lg px-3 py-2 border border-gray-600 focus:border-primary outline-none transition-colors"
+                                    >
+                                        <option value="">Select Category</option>
+                                        {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                                    </select>
+                                </div>
+                            ) : (
+                                <div className="relative z-10 pb-4">
+                                    <p className="text-sm font-semibold text-primary">Suggested: {suggestedMerchant}</p>
+                                    <p className="text-sm font-semibold mt-1 text-primary">Category: {suggestedCategory}</p>
+                                </div>
+                            )}
+
+                            <p className="relative z-10 text-xs text-gray-500">{format(new Date(currentTx.date), 'dd MMM yyyy')}</p>
+                        </Card>
+                    )}
+
+                    {currentIndex >= uncategorizedTxs.length && (
+                        <Card className="w-full h-96 flex flex-col justify-center items-center text-center absolute z-10">
                             <h3 className="text-2xl font-bold text-white">All Done!</h3>
                             <p className="text-gray-400 mt-2">You've categorized all your recent transactions.</p>
                         </Card>
-                     )}
+                    )}
                 </div>
-                
+
                 {currentTx && (
                     <>
                     <div className="flex justify-center items-center gap-6">
@@ -274,7 +328,7 @@ const Categorize: React.FC<CategorizeProps> = ({ transactions: uncategorizedTxs,
                         <button onClick={handleEditClick} className={`w-24 h-24 rounded-full bg-yellow-800/50 text-yellow-400 flex items-center justify-center hover:bg-yellow-800/70 transition-all duration-300 ${isEditing ? 'opacity-0 scale-50 pointer-events-none' : 'opacity-100 scale-100'}`}>
                             <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" /></svg>
                         </button>
-                        <button onClick={handleAccept} className="w-20 h-20 rounded-full bg-green-900/50 text-green-400 flex items-center justify-center hover:bg-green-900/70 transition-colors">
+                        <button onClick={handleAcceptCard} className="w-20 h-20 rounded-full bg-green-900/50 text-green-400 flex items-center justify-center hover:bg-green-900/70 transition-colors">
                              <svg className="w-9 h-9" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
                         </button>
                     </div>

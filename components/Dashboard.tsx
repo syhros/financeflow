@@ -1,11 +1,11 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import Card from './Card';
 import { Page, Asset, Debt, Bill, Transaction, User, Notification, NotificationType } from '../types';
 import { BalanceChart } from './charts';
-import { BellIcon, PlusIcon, iconMap, SettingsIcon, CalendarDaysIcon, CheckCircleIcon, InformationCircleIcon } from './icons';
+import { BellIcon, iconMap } from './icons';
 import { format, addDays, isWithinInterval, formatDistanceToNow } from 'date-fns';
 import { useCurrency } from '../App';
-import { generateAssetChartData, generateDebtChartData, generateNetWorthChartData } from '../data/mockData';
+import { generateAssetChartData, generateDebtChartData, generateNetWorthChartData } from '../utils/chartUtils';
 import { ProfileModal, AccountSelectionModal, NotificationsPopout } from './shared/UserModals';
 
 // Custom hook to detect clicks outside a component
@@ -115,7 +115,6 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
     const { navigateTo, assets, debts, bills, transactions, user, onUpdateUser, notifications, onMarkAllNotificationsRead, onNotificationClick, isSummaryModalOpen, summaryTransactions, onCloseSummaryModal, theme, onToggleTheme } = props;
     const [balanceType, setBalanceType] = useState<'assets' | 'debts' | 'networth'>('networth');
     const [timePeriod, setTimePeriod] = useState<'Day' | 'Week' | 'Month' | 'Year'>('Month');
-    const [chartTimeFilter, setChartTimeFilter] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [isAccountSelectionOpen, setIsAccountSelectionOpen] = useState(false);
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);

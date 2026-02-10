@@ -342,6 +342,73 @@ export const categoriesService = {
     if (error) throw error;
     return data;
   },
+
+  async updateCategory(categoryId: string, updates: Partial<Category>) {
+    const { data, error } = await supabase
+      .from('categories')
+      .update(updates)
+      .eq('id', categoryId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteCategory(categoryId: string) {
+    const { error } = await supabase
+      .from('categories')
+      .delete()
+      .eq('id', categoryId);
+
+    if (error) throw error;
+  },
+};
+
+// Transaction rules operations
+export const transactionRulesService = {
+  async getRules(userId: string) {
+    const { data, error } = await supabase
+      .from('transaction_rules')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async createRule(userId: string, rule: Omit<TransactionRule, 'id'>) {
+    const { data, error } = await supabase
+      .from('transaction_rules')
+      .insert({ ...rule, user_id: userId })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async updateRule(ruleId: string, updates: Partial<TransactionRule>) {
+    const { data, error } = await supabase
+      .from('transaction_rules')
+      .update(updates)
+      .eq('id', ruleId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteRule(ruleId: string) {
+    const { error } = await supabase
+      .from('transaction_rules')
+      .delete()
+      .eq('id', ruleId);
+
+    if (error) throw error;
+  },
 };
 
 // Budget operations

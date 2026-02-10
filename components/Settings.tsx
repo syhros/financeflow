@@ -12,6 +12,7 @@ interface SettingsProps {
     onDeleteCategory: (categoryId: string) => void;
     rules: TransactionRule[];
     onAddRule: (rule: Omit<TransactionRule, 'id'>) => void;
+    onUpdateRule: (rule: TransactionRule) => void;
     onDeleteRule: (ruleId: string) => void;
     onWipeData: (option: string) => void;
     notificationsEnabled: boolean;
@@ -154,23 +155,42 @@ const TransactionRulesModal: React.FC<{
     rules: TransactionRule[];
     categories: Category[];
     onAddRule: (rule: Omit<TransactionRule, 'id'>) => void;
+    onUpdateRule: (rule: TransactionRule) => void;
     onDeleteRule: (ruleId: string) => void;
-}> = ({ isOpen, onClose, rules, categories, onAddRule, onDeleteRule }) => {
+}> = ({ isOpen, onClose, rules, categories, onAddRule, onUpdateRule, onDeleteRule }) => {
     const [showAddForm, setShowAddForm] = useState(false);
+    const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
     const [keyword, setKeyword] = useState('');
     const [merchantName, setMerchantName] = useState('');
     const [categoryName, setCategoryName] = useState('');
 
-    const handleAddRule = () => {
+    const resetForm = () => {
+        setKeyword('');
+        setMerchantName('');
+        setCategoryName('');
+        setEditingRuleId(null);
+        setShowAddForm(false);
+    };
+
+    const handleSaveRule = () => {
         if (keyword && (merchantName || categoryName)) {
-            onAddRule({ keyword, merchantName: merchantName || undefined, categoryName: categoryName || undefined });
-            setKeyword('');
-            setMerchantName('');
-            setCategoryName('');
-            setShowAddForm(false);
+            if (editingRuleId) {
+                onUpdateRule({ id: editingRuleId, keyword, merchantName: merchantName || undefined, categoryName: categoryName || undefined });
+            } else {
+                onAddRule({ keyword, merchantName: merchantName || undefined, categoryName: categoryName || undefined });
+            }
+            resetForm();
         } else {
             alert('A rule must have a keyword and at least one action (set merchant or category).');
         }
+    };
+
+    const handleEditRule = (rule: TransactionRule) => {
+        setEditingRuleId(rule.id);
+        setKeyword(rule.keyword);
+        setMerchantName(rule.merchantName || '');
+        setCategoryName(rule.categoryName || '');
+        setShowAddForm(true);
     };
     
     if (!isOpen) return null;
@@ -204,7 +224,10 @@ const TransactionRulesModal: React.FC<{
                                         </>
                                     )}
                                 </div>
-                                <button onClick={() => onDeleteRule(rule.id)} className="text-gray-400 hover:text-red-400 flex-shrink-0 ml-4"><TrashIcon className="w-5 h-5"/></button>
+                                <div className="flex gap-2 flex-shrink-0 ml-4">
+                                    <button onClick={() => handleEditRule(rule)} className="text-gray-400 hover:text-yellow-400"><PencilIcon className="w-5 h-5"/></button>
+                                    <button onClick={() => onDeleteRule(rule.id)} className="text-gray-400 hover:text-red-400"><TrashIcon className="w-5 h-5"/></button>
+                                </div>
                             </div>
                         ))}
                          {rules.length === 0 && !showAddForm && <p className="text-center text-gray-500 py-4">No rules created yet.</p>}
@@ -226,8 +249,8 @@ const TransactionRulesModal: React.FC<{
                                 </div>
                             </div>
                             <div className="flex gap-4">
-                                <button onClick={() => setShowAddForm(false)} className="w-full py-2 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-500">Cancel</button>
-                                <button onClick={handleAddRule} className="w-full py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-500">Save Rule</button>
+                                <button onClick={resetForm} className="w-full py-2 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-500">Cancel</button>
+                                <button onClick={handleSaveRule} className="w-full py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-500">{editingRuleId ? 'Update Rule' : 'Save Rule'}</button>
                             </div>
                         </div>
                     ) : (
@@ -1508,7 +1531,7 @@ const Settings: React.FC<SettingsProps> = (props) => {
     return (
         <>
             <ManageCategoriesModal isOpen={isCatModalOpen} onClose={() => setIsCatModalOpen(false)} categories={categories} onAddCategory={onAddCategory} onUpdateCategory={onUpdateCategory} onDeleteCategory={onDeleteCategory} />
-            <TransactionRulesModal isOpen={isRulesModalOpen} onClose={() => setIsRulesModalOpen(false)} rules={rules} categories={categories} onAddRule={onAddRule} onDeleteRule={onDeleteRule} />
+            <TransactionRulesModal isOpen={isRulesModalOpen} onClose={() => setIsRulesModalOpen(false)} rules={rules} categories={categories} onAddRule={onAddRule} onUpdateRule={onUpdateRule} onDeleteRule={onDeleteRule} />
             <WipeDataModal isOpen={isWipeModalOpen} onClose={() => setIsWipeModalOpen(false)} onWipe={onWipeData} />
             <CustomDataDeletionModal isOpen={isCustomDeletionModalOpen} onClose={() => setIsCustomDeletionModalOpen(false)} assets={assets} debts={debts} bills={bills} goals={goals} recurringPayments={recurringPayments} onDeleteAccount={(id) => { const asset = assets.find(a => a.id === id); const debt = debts.find(d => d.id === id); if (asset) onDeleteAsset(id); else if (debt) onDeleteDebt(id); }} onDeleteBill={onDeleteBill} onDeleteGoal={onDeleteGoal} onDeleteRecurring={onDeleteRecurring} onDeleteTransactions={onDeleteTransactions} />
             <ExportDataModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} assets={assets} debts={debts} />

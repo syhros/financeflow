@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import Card from './Card';
 import { IncomeExpenseChart, NetWorthChart } from './charts';
-import { dynamicNetWorthData, dynamicIncomeExpenseData, generateIncomeExpenseData, generateNetWorthData } from '../data/mockData';
+import { generateIncomeExpenseData, generateNetWorthData } from '../utils/chartUtils';
 import { Asset, Debt, Transaction, User, Notification, Page } from '../types';
 import { useCurrency } from '../App';
 import UserHeader from './shared/UserHeader';

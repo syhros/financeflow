@@ -17,8 +17,8 @@ import Categorize from './components/Categorize';
 import { mockAssets, mockDebts, mockGoals, mockBills, mockRecurringPayments, allTransactions, mockBudgets, mockCategories, mockRules, mockUser } from './data/mockData';
 import { fetchMarketData } from './services/marketData';
 import { generateNotifications } from './services/notificationService';
-// FIX: Removed `subMonths` as it was causing an import error. `addMonths` with a negative value will be used instead.
-import { addWeeks, addMonths, addYears, isAfter } from 'date-fns';
+import { userService, assetsService, debtsService, transactionsService, goalsService, billsService, recurringPaymentsService, categoriesService, transactionRulesService, budgetService, settingsService } from './services/database';
+import { addMonths } from 'date-fns';
 
 // --- Context for Currency ---
 interface CurrencyContextType {
@@ -87,12 +87,69 @@ const App: React.FC = () => {
     const [theme, setTheme] = usePersistentState<'light' | 'dark'>('zenith-theme', 'dark');
 
     const [marketData, setMarketData] = useState<MarketData>({});
+    const [isDataLoading, setIsDataLoading] = useState(false);
 
     // --- Interactive Notification State ---
     const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
     const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
     const [summaryTransactions, setSummaryTransactions] = useState<Transaction[]>([]);
 
+    useEffect(() => {
+        if (!authUser || isDataLoading) return;
+
+        const loadUserData = async () => {
+            try {
+                setIsDataLoading(true);
+
+                const [userProfile, userAssets, userDebts, userTransactions, userGoals, userBills, userRecurring, userCategories, userRules, userBudget, userSettings] = await Promise.all([
+                    userService.getUser(authUser.id),
+                    assetsService.getAssets(authUser.id),
+                    debtsService.getDebts(authUser.id),
+                    transactionsService.getTransactions(authUser.id),
+                    goalsService.getGoals(authUser.id),
+                    billsService.getBills(authUser.id),
+                    recurringPaymentsService.getRecurringPayments(authUser.id),
+                    categoriesService.getCategories(authUser.id),
+                    transactionRulesService.getRules(authUser.id),
+                    budgetService.getBudget(authUser.id),
+                    settingsService.getSettings(authUser.id),
+                ]);
+
+                if (userProfile) {
+                    setUser({
+                        name: userProfile.name || '',
+                        username: userProfile.username || '',
+                        email: userProfile.email || '',
+                        avatarUrl: userProfile.avatar_url || ''
+                    });
+                }
+
+                if (userAssets && userAssets.length > 0) setAssets(userAssets);
+                if (userDebts && userDebts.length > 0) setDebts(userDebts);
+                if (userTransactions && userTransactions.length > 0) setTransactions(userTransactions);
+                if (userGoals && userGoals.length > 0) setGoals(userGoals);
+                if (userBills && userBills.length > 0) setBills(userBills);
+                if (userRecurring && userRecurring.length > 0) setRecurringPayments(userRecurring);
+                if (userCategories && userCategories.length > 0) setCategories(userCategories);
+                if (userRules && userRules.length > 0) setRules(userRules);
+                if (userBudget) setBudgets(userBudget);
+
+                if (userSettings) {
+                    setCurrency(userSettings.currency || 'GBP');
+                    setNotificationsEnabled(userSettings.notifications_enabled ?? true);
+                    setAutoCategorize(userSettings.auto_categorize ?? true);
+                    setSmartSuggestions(userSettings.smart_suggestions ?? true);
+                    setTheme(userSettings.theme || 'dark');
+                }
+            } catch (error) {
+                console.error('Failed to load user data:', error);
+            } finally {
+                setIsDataLoading(false);
+            }
+        };
+
+        loadUserData();
+    }, [authUser]);
 
     const formatCurrency = useCallback((amount: number) => {
         const options = {
@@ -166,44 +223,123 @@ const App: React.FC = () => {
     }, []);
 
     // User Handler
-    const handleUpdateUser = (updatedUser: User) => setUser(updatedUser);
+    const handleUpdateUser = (updatedUser: User) => {
+        setUser(updatedUser);
+        if (authUser) {
+            userService.updateUser(authUser.id, {
+                name: updatedUser.name,
+                username: updatedUser.username,
+                avatar_url: updatedUser.avatarUrl
+            }).catch(err => console.error('Failed to update user:', err));
+        }
+    };
 
     // Asset Handlers
-    const handleAddAsset = (asset: Omit<Asset, 'id'>) => setAssets(prev => [...prev, { ...asset, id: new Date().toISOString() }]);
+    const handleAddAsset = (asset: Omit<Asset, 'id'>) => {
+        const newAsset = { ...asset, id: new Date().toISOString() };
+        setAssets(prev => [...prev, newAsset]);
+        if (authUser) {
+            assetsService.createAsset(authUser.id, asset).catch(err => console.error('Failed to add asset:', err));
+        }
+    };
     const handleUpdateAsset = (updatedAsset: Asset, oldBalance?: number) => {
-        // Update the asset with all new properties
         setAssets(prev => prev.map(a => a.id === updatedAsset.id ? updatedAsset : a));
+        if (authUser) {
+            assetsService.updateAsset(updatedAsset.id, updatedAsset).catch(err => console.error('Failed to update asset:', err));
+        }
     };
     const handleDeleteAsset = (assetId: string) => {
         setAssets(prev => prev.filter(a => a.id !== assetId));
         setTransactions(prev => prev.filter(t => t.accountId !== assetId));
+        if (authUser) {
+            assetsService.deleteAsset(assetId).catch(err => console.error('Failed to delete asset:', err));
+        }
     };
 
     // Debt Handlers
-    const handleAddDebt = (debt: Omit<Debt, 'id'>) => setDebts(prev => [...prev, { ...debt, id: new Date().toISOString() }]);
+    const handleAddDebt = (debt: Omit<Debt, 'id'>) => {
+        const newDebt = { ...debt, id: new Date().toISOString() };
+        setDebts(prev => [...prev, newDebt]);
+        if (authUser) {
+            debtsService.createDebt(authUser.id, debt).catch(err => console.error('Failed to add debt:', err));
+        }
+    };
     const handleUpdateDebt = (updatedDebt: Debt, oldBalance?: number) => {
-        // Update the debt with all new properties
         setDebts(prev => prev.map(d => d.id === updatedDebt.id ? updatedDebt : d));
+        if (authUser) {
+            debtsService.updateDebt(updatedDebt.id, updatedDebt).catch(err => console.error('Failed to update debt:', err));
+        }
     };
     const handleDeleteDebt = (debtId: string) => {
         setDebts(prev => prev.filter(d => d.id !== debtId));
         setTransactions(prev => prev.filter(t => t.accountId !== debtId));
+        if (authUser) {
+            debtsService.deleteDebt(debtId).catch(err => console.error('Failed to delete debt:', err));
+        }
     };
 
     // Goal Handlers
-    const handleAddGoal = (goal: Omit<Goal, 'id'>) => setGoals(prev => [...prev, { ...goal, id: new Date().toISOString() }]);
-    const handleUpdateGoal = (updatedGoal: Goal) => setGoals(prev => prev.map(g => g.id === updatedGoal.id ? updatedGoal : g));
-    const handleDeleteGoal = (goalId: string) => setGoals(prev => prev.filter(g => g.id !== goalId));
+    const handleAddGoal = (goal: Omit<Goal, 'id'>) => {
+        const newGoal = { ...goal, id: new Date().toISOString() };
+        setGoals(prev => [...prev, newGoal]);
+        if (authUser) {
+            goalsService.createGoal(authUser.id, goal).catch(err => console.error('Failed to add goal:', err));
+        }
+    };
+    const handleUpdateGoal = (updatedGoal: Goal) => {
+        setGoals(prev => prev.map(g => g.id === updatedGoal.id ? updatedGoal : g));
+        if (authUser) {
+            goalsService.updateGoal(updatedGoal.id, updatedGoal).catch(err => console.error('Failed to update goal:', err));
+        }
+    };
+    const handleDeleteGoal = (goalId: string) => {
+        setGoals(prev => prev.filter(g => g.id !== goalId));
+        if (authUser) {
+            goalsService.deleteGoal(goalId).catch(err => console.error('Failed to delete goal:', err));
+        }
+    };
 
     // Bill Handlers
-    const handleAddBill = (bill: Omit<Bill, 'id'>) => setBills(prev => [...prev, { ...bill, id: new Date().toISOString() }]);
-    const handleUpdateBill = (updatedBill: Bill) => setBills(prev => prev.map(b => b.id === updatedBill.id ? updatedBill : b));
-    const handleDeleteBill = (billId: string) => setBills(prev => prev.filter(b => b.id !== billId));
+    const handleAddBill = (bill: Omit<Bill, 'id'>) => {
+        const newBill = { ...bill, id: new Date().toISOString() };
+        setBills(prev => [...prev, newBill]);
+        if (authUser) {
+            billsService.createBill(authUser.id, bill).catch(err => console.error('Failed to add bill:', err));
+        }
+    };
+    const handleUpdateBill = (updatedBill: Bill) => {
+        setBills(prev => prev.map(b => b.id === updatedBill.id ? updatedBill : b));
+        if (authUser) {
+            billsService.updateBill(updatedBill.id, updatedBill).catch(err => console.error('Failed to update bill:', err));
+        }
+    };
+    const handleDeleteBill = (billId: string) => {
+        setBills(prev => prev.filter(b => b.id !== billId));
+        if (authUser) {
+            billsService.deleteBill(billId).catch(err => console.error('Failed to delete bill:', err));
+        }
+    };
 
     // Recurring Payment Handlers
-    const handleAddRecurringPayment = (payment: Omit<RecurringPayment, 'id'>) => setRecurringPayments(prev => [...prev, { ...payment, id: new Date().toISOString() }]);
-    const handleUpdateRecurringPayment = (updatedPayment: RecurringPayment) => setRecurringPayments(prev => prev.map(p => p.id === updatedPayment.id ? updatedPayment : p));
-    const handleDeleteRecurringPayment = (paymentId: string) => setRecurringPayments(prev => prev.filter(p => p.id !== paymentId));
+    const handleAddRecurringPayment = (payment: Omit<RecurringPayment, 'id'>) => {
+        const newPayment = { ...payment, id: new Date().toISOString() };
+        setRecurringPayments(prev => [...prev, newPayment]);
+        if (authUser) {
+            recurringPaymentsService.createRecurringPayment(authUser.id, payment).catch(err => console.error('Failed to add recurring payment:', err));
+        }
+    };
+    const handleUpdateRecurringPayment = (updatedPayment: RecurringPayment) => {
+        setRecurringPayments(prev => prev.map(p => p.id === updatedPayment.id ? updatedPayment : p));
+        if (authUser) {
+            recurringPaymentsService.updateRecurringPayment(updatedPayment.id, updatedPayment).catch(err => console.error('Failed to update recurring payment:', err));
+        }
+    };
+    const handleDeleteRecurringPayment = (paymentId: string) => {
+        setRecurringPayments(prev => prev.filter(p => p.id !== paymentId));
+        if (authUser) {
+            recurringPaymentsService.deleteRecurringPayment(paymentId).catch(err => console.error('Failed to delete recurring payment:', err));
+        }
+    };
     
     // Transaction Handlers
     const handleAddTransaction = (transaction: Omit<Transaction, 'id'>) => {
@@ -532,16 +668,54 @@ const App: React.FC = () => {
     };
 
     // Budget Handlers
-    const handleUpdateBudgets = (updatedBudgets: Budgets) => setBudgets(updatedBudgets);
+    const handleUpdateBudgets = (updatedBudgets: Budgets) => {
+        setBudgets(updatedBudgets);
+        if (authUser) {
+            budgetService.upsertBudget(authUser.id, updatedBudgets).catch(err => console.error('Failed to update budgets:', err));
+        }
+    };
 
     // Category Handlers
-    const handleAddCategory = (category: Omit<Category, 'id'>) => setCategories(prev => [...prev, { ...category, id: new Date().toISOString() }]);
-    const handleUpdateCategory = (updatedCategory: Category) => setCategories(prev => prev.map(c => c.id === updatedCategory.id ? updatedCategory : c));
-    const handleDeleteCategory = (categoryId: string) => setCategories(prev => prev.filter(c => c.id !== categoryId));
-    
+    const handleAddCategory = (category: Omit<Category, 'id'>) => {
+        const newCategory = { ...category, id: new Date().toISOString() };
+        setCategories(prev => [...prev, newCategory]);
+        if (authUser) {
+            categoriesService.createCategory(authUser.id, category).catch(err => console.error('Failed to add category:', err));
+        }
+    };
+    const handleUpdateCategory = (updatedCategory: Category) => {
+        setCategories(prev => prev.map(c => c.id === updatedCategory.id ? updatedCategory : c));
+        if (authUser) {
+            categoriesService.updateCategory(updatedCategory.id, updatedCategory).catch(err => console.error('Failed to update category:', err));
+        }
+    };
+    const handleDeleteCategory = (categoryId: string) => {
+        setCategories(prev => prev.filter(c => c.id !== categoryId));
+        if (authUser) {
+            categoriesService.deleteCategory(categoryId).catch(err => console.error('Failed to delete category:', err));
+        }
+    };
+
     // Rule Handlers
-    const handleAddRule = (rule: Omit<TransactionRule, 'id'>) => setRules(prev => [...prev, { ...rule, id: new Date().toISOString() }]);
-    const handleDeleteRule = (ruleId: string) => setRules(prev => prev.filter(r => r.id !== ruleId));
+    const handleAddRule = (rule: Omit<TransactionRule, 'id'>) => {
+        const newRule = { ...rule, id: new Date().toISOString() };
+        setRules(prev => [...prev, newRule]);
+        if (authUser) {
+            transactionRulesService.createRule(authUser.id, rule).catch(err => console.error('Failed to add rule:', err));
+        }
+    };
+    const handleUpdateRule = (updatedRule: TransactionRule) => {
+        setRules(prev => prev.map(r => r.id === updatedRule.id ? updatedRule : r));
+        if (authUser) {
+            transactionRulesService.updateRule(updatedRule.id, updatedRule).catch(err => console.error('Failed to update rule:', err));
+        }
+    };
+    const handleDeleteRule = (ruleId: string) => {
+        setRules(prev => prev.filter(r => r.id !== ruleId));
+        if (authUser) {
+            transactionRulesService.deleteRule(ruleId).catch(err => console.error('Failed to delete rule:', err));
+        }
+    };
 
     // Notification Handlers
     const handleMarkAllNotificationsRead = () => setNotifications(prev => prev.map(n => ({ ...n, read: true })));
@@ -667,7 +841,7 @@ const App: React.FC = () => {
             case Page.Settings:
                 return <Settings
                             categories={categories} onAddCategory={handleAddCategory} onUpdateCategory={handleUpdateCategory} onDeleteCategory={handleDeleteCategory}
-                            rules={rules} onAddRule={handleAddRule} onDeleteRule={handleDeleteRule}
+                            rules={rules} onAddRule={handleAddRule} onUpdateRule={handleUpdateRule} onDeleteRule={handleDeleteRule}
                             onWipeData={handleWipeData}
                             notificationsEnabled={notificationsEnabled} onToggleNotifications={() => setNotificationsEnabled(prev => !prev)}
                             autoCategorize={autoCategorize} onToggleAutoCategorize={() => setAutoCategorize(prev => !prev)}
@@ -704,7 +878,7 @@ const App: React.FC = () => {
         }
     };
 
-    if (authLoading) {
+    if (authLoading || (authUser && isDataLoading)) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-slate-900">
                 <LoadingSpinner />
