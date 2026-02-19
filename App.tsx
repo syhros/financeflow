@@ -98,99 +98,8 @@ const App: React.FC = () => {
     const [summaryTransactions, setSummaryTransactions] = useState<Transaction[]>([]);
 
     useEffect(() => {
-        if (!authUser || isDataLoading) return;
-
-        const loadUserData = async () => {
-            try {
-                setIsDataLoading(true);
-
-                const [userProfile, userAssets, userDebts, userTransactions, userGoals, userBills, userRecurring, userCategories, userRules, userBudget, userSettings] = await Promise.all([
-                    userService.getUser(authUser.id),
-                    assetsService.getAssets(authUser.id),
-                    debtsService.getDebts(authUser.id),
-                    transactionsService.getTransactions(authUser.id),
-                    goalsService.getGoals(authUser.id),
-                    billsService.getBills(authUser.id),
-                    recurringPaymentsService.getRecurringPayments(authUser.id),
-                    categoriesService.getCategories(authUser.id),
-                    transactionRulesService.getRules(authUser.id),
-                    budgetService.getBudget(authUser.id),
-                    settingsService.getSettings(authUser.id),
-                ]);
-
-                if (userProfile) {
-                    setUser({
-                        name: userProfile.name || '',
-                        username: userProfile.username || '',
-                        email: userProfile.email || '',
-                        avatarUrl: userProfile.avatar_url || ''
-                    });
-                }
-
-                if (userAssets && userAssets.length > 0) {
-                    const assetsWithMetadata = await Promise.all(userAssets.map(async (asset: any) => {
-                        if (asset.type === 'Investing' && asset.holdings && asset.holdings.length > 0) {
-                            const metadata = await holdingsService.getHoldingsMetadata(asset.id);
-                            const metadataMap = new Map(metadata.map((m: any) => [m.ticker, m]));
-                            const holdings = asset.holdings.map((h: any) => {
-                                const meta = metadataMap.get(h.ticker);
-                                const currencyPrice = meta?.currency_price || h.currencyPrice || 'GBP';
-                                const isPennyStock = meta?.is_penny_stock ?? (currencyPrice === 'GBX');
-                                const isLondonListed = meta?.is_london_listed ?? isPennyStock;
-
-                                return {
-                                    ...h,
-                                    id: meta?.id || h.id,
-                                    icon: meta?.icon || h.icon,
-                                    isLondonListed,
-                                    isPennyStock,
-                                    currencyPrice,
-                                };
-                            });
-
-                            const updatedAsset = {
-                                ...asset,
-                                holdings
-                            };
-
-                            // Sync corrected flags to database
-                            if (holdings.some(h => h.isPennyStock || h.isLondonListed)) {
-                                syncHoldingsToDatabase(updatedAsset).catch(err =>
-                                    console.error('Failed to sync holdings on load:', err)
-                                );
-                            }
-
-                            return updatedAsset;
-                        }
-                        return asset;
-                    }));
-                    setAssets(assetsWithMetadata);
-                }
-                if (userDebts && userDebts.length > 0) setDebts(userDebts);
-                if (userTransactions && userTransactions.length > 0) setTransactions(userTransactions);
-                if (userGoals && userGoals.length > 0) setGoals(userGoals);
-                if (userBills && userBills.length > 0) setBills(userBills);
-                if (userRecurring && userRecurring.length > 0) setRecurringPayments(userRecurring);
-                if (userCategories && userCategories.length > 0) setCategories(userCategories);
-                if (userRules && userRules.length > 0) setRules(userRules);
-                if (userBudget) setBudgets(userBudget);
-
-                if (userSettings) {
-                    setCurrency(userSettings.currency || 'GBP');
-                    setNotificationsEnabled(userSettings.notifications_enabled ?? true);
-                    setAutoCategorize(userSettings.auto_categorize ?? true);
-                    setSmartSuggestions(userSettings.smart_suggestions ?? true);
-                    setTheme(userSettings.theme || 'dark');
-                }
-            } catch (error) {
-                console.error('Failed to load user data:', error);
-            } finally {
-                setIsDataLoading(false);
-            }
-        };
-
-        loadUserData();
-    }, [authUser]);
+        // Auth bypassed: using mock/persisted data only
+    }, []);
 
     const formatCurrency = useCallback((amount: number) => {
         const options = {
@@ -1343,18 +1252,6 @@ const App: React.FC = () => {
                         />;
         }
     };
-
-    if (authLoading || (authUser && isDataLoading)) {
-        return (
-            <div className="flex min-h-screen items-center justify-center bg-slate-900">
-                <LoadingSpinner />
-            </div>
-        );
-    }
-
-    if (!authUser) {
-        return <AuthContainer />;
-    }
 
     return (
         <CurrencyContext.Provider value={{ currency, setCurrency, formatCurrency }}>
